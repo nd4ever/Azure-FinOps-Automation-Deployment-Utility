@@ -1,0 +1,50 @@
+let resources = materialize(ResourceCosts(tagCostStart, tagCostEnd, ""));
+let tags = materialize(ResourceTagCosts(tagCostStart, tagCostEnd, ""));
+let subscriptionTags = materialize(SubscriptionTagCosts(tagCostStart, tagCostEnd, ""));
+union
+    (resources | where SubscriptionId == "sub1" and BillingCurrency == "USD"
+        | summarize Total = sum(ResourceBilledCost)
+        | project Check = "Resource totals reconcile including unassigned/deleted charges", Passed = Total == 44.0),
+    (resources | where ResourceName == "noexports"
+        | summarize Rows = count(), Records = sum(ResourceCostRecordCount)
+        | project Check = "Current resources without cost exports are retained", Passed = Rows == 1 and Records == 0),
+    (resources | where isempty(ResourceId)
+        | summarize Rows = count(), Total = sum(ResourceBilledCost)
+        | project Check = "Summary sentinels are excluded but unassigned charges remain", Passed = Rows == 1 and Total == 3.0),
+    (resources | where ResourceName == "deleted"
+        | summarize Rows = count(), Current = countif(InCurrentInventory), Total = sum(ResourceBilledCost)
+        | project Check = "Historical resources are not lost", Passed = Rows == 1 and Current == 0 and Total == 11.0),
+    (resources | where SubscriptionId == "sub1" and ResourceName == "vm1"
+        | summarize Rows = count(), Dollars = sumif(ResourceBilledCost, BillingCurrency == "USD"),
+            Euros = sumif(ResourceBilledCost, BillingCurrency == "EUR")
+        | project Check = "Case-normalized IDs match inventory and currencies stay separate", Passed = Rows == 2 and Dollars == 30.0 and Euros == 5.0),
+    (tags | where TagSource == "Resource/cost" and TagName == "Environment" and TagValue == "Prod"
+        | summarize Rows = count(), Total = sum(TagBilledCost), NoExports = countif(ResourceName == "noexports")
+        | project Check = "Current no-cost tags supplement historical exported tags", Passed = Rows == 3 and Total == 21.0 and NoExports == 1),
+    (tags | where ResourceName == "vm1" and SubscriptionId == "sub1" and TagSource == "Resource/cost"
+        | summarize CurrentTagRows = countif(TagValue == "Staging")
+        | project Check = "Current tags are not retroactively applied to historical costs", Passed = CurrentTagRows == 0),
+    (tags | where TagSource == "Resource/cost" and TagName in ("Environment", "Owner")
+        | summarize Names = dcount(TagName), Rows = count()
+        | project Check = "Multiple tag names return independent rows", Passed = Names == 2 and Rows == 7),
+    (tags | extend PairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))
+        | where PairKey in (dynamic(['["Resource/cost",true,"Owner","Prod"]']))
+        | summarize Rows = count(), Total = sum(TagBilledCost)
+        | project Check = "Exact pairs do not cross-match names or sources", Passed = Rows == 1 and Total == 20.0),
+    (tags | where TagSource == "Resource/cost" and TagName == "(No tags)"
+        | summarize RealTags = countif(HasTag), Untagged = countif(not(HasTag))
+        | project Check = "A literal no-tags key stays distinct from untagged records", Passed = RealTags == 1 and Untagged == 3),
+    (ResourceTagCosts(tagCostStart, tagCostEnd, "USD")
+        | where SubscriptionId == "sub1" and TagSource == "Subscription"
+        and TagName == "Environment" and TagValue == "Production" and BillingCurrency == "USD"
+        | summarize Rows = count(), Total = sum(TagBilledCost)
+        | project Check = "Subscription tags attribute resource totals without inheritance", Passed = Rows == 5 and Total == 44.0),
+    (subscriptionTags | where SubscriptionId == "sub1" and TagSource == "Resource/cost"
+        and TagName == "Environment" and TagValue == "Prod" and BillingCurrency == "USD"
+        | summarize Rows = count(), Total = sum(BilledCost)
+        | project Check = "Subscription breakdown preserves cost-tag totals", Passed = Rows == 1 and Total == 21.0),
+    (tags | extend NameKey = tostring(pack_array(HasTag, TagName))
+        | where NameKey in (dynamic([]))
+        | summarize Rows = count()
+        | project Check = "Empty selections do not mean All", Passed = Rows == 0)
+| order by Check asc

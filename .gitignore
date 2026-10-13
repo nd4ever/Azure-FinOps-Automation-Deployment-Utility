@@ -3,3 +3,6 @@ logs/
 
 # Your own parameter files for unattended runs
 *.local.psd1
+**/bin/
+**/obj/
+**/__pycache__/

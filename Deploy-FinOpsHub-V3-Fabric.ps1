@@ -35,7 +35,9 @@
          JSON summary to .\logs.
 
     Values come from parametersFile.json (null values fall back to template defaults). Parameters passed to this script
-    override the file. Public access is always disabled and Azure Data Explorer is never deployed by this version.
+    override the file. Public access is disabled by default (private endpoints); pass -UsePublicNetworking to deploy
+    the hub with public network access instead (no virtual network, private endpoints or private DNS needed).
+    Azure Data Explorer is never deployed by this version.
 
     Guided setup: run the script without the subscription, resource group, virtual network or subnet parameters in an
     interactive session. It lists your subscriptions, virtual networks, subnets, Fabric regions with quota and private
@@ -57,6 +59,18 @@
 
 .PARAMETER ResourceGroupName
     Resource group for the FinOps hub (and by default the Fabric capacity). Created when missing. Prompted when omitted.
+
+.PARAMETER UsePublicNetworking
+    Deploy the hub with public network access: no virtual network, subnet, private endpoints, private DNS zones or
+    Data Factory managed virtual network are created or required, and Data Factory public access stays enabled.
+    The virtual network, subnet and private DNS parameters are ignored. Access is still protected by Entra ID/RBAC;
+    consider restricting the storage account and Data Factory by IP address after deployment.
+
+.PARAMETER ScriptStorageTags
+    Tags (hashtable) to put on every storage account that appears in the hub resource group during the template
+    deployment, including the one the deployment-script service creates itself. Key-based access is enabled and the
+    firewall opened (public access Enabled, default action Allow) on each account, because deployment scripts need both. Use it when a policy turns off shared key access unless an exemption tag is present, for example
+    -ScriptStorageTags @{ Security = 'Exception'; SecurityControl = 'Ignore' }. Deployment scripts need key access.
 
 .PARAMETER VirtualNetworkName
     Existing virtual network that will host the private endpoints. Prompted with a list when omitted.
@@ -215,6 +229,8 @@
 param(
     [ValidatePattern('^([0-9a-fA-F-]{36})?$')][string] $SubscriptionId,
     [ValidateLength(0, 90)][string] $ResourceGroupName,
+    [switch] $UsePublicNetworking,
+    [hashtable] $ScriptStorageTags = @{},
     [string] $VirtualNetworkName,
     [string] $VirtualNetworkResourceGroupName,
     [string] $PrivateEndpointSubnetName,
@@ -1384,13 +1400,36 @@ function Get-EffectiveTemplateParameters {
     if ($EnableRecommendations) { $values['enableRecommendations'] = $true }
     # This script creates the exports itself; managed exports stay off unless explicitly enabled in the file.
     if (-not $values.Contains('enableManagedExports')) { $values['enableManagedExports'] = $false }
-    $values['enablePublicAccess'] = $false
+    $values['enablePublicAccess'] = [bool]$UsePublicNetworking
     $mergedTags = @{}
     foreach ($source in @((Get-Value $values 'tags' @{}), $Tags)) { foreach ($key in $source.Keys) { $mergedTags[$key] = $source[$key] } }
     $values['tags'] = $mergedTags
     $prefix = [string](Get-Value $values 'virtualNetworkAddressPrefix' '10.20.30.0/26')
     if ($prefix -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|1\d|2[0-6])$') { throw "virtualNetworkAddressPrefix '$prefix' must be a valid CIDR of /26 or larger." }
     return $values
+}
+
+function Start-StorageTagWatcher([string] $Subscription, [string] $Group, [hashtable] $Tags) {
+    <# Background job: every few seconds tags storage accounts in the resource group that lack the tags and enables
+       shared key access on them, so deployment scripts can mount their storage before a policy switches keys off. #>
+    $tagArgs = @($Tags.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" })
+    Start-ThreadJob -ScriptBlock {
+        param($Sub, $Rg, $TagList, $TagKeys)
+        while ($true) {
+            try {
+                $accounts = az storage account list --subscription $Sub --resource-group $Rg --query '[].{id:id,name:name,tags:tags}' --output json 2>$null | ConvertFrom-Json
+                foreach ($account in @($accounts)) {
+                    $missing = @($TagKeys | Where-Object { -not $account.tags -or -not $account.tags.PSObject.Properties[$_] })
+                    if ($missing.Count -gt 0) {
+                        az tag update --resource-id $account.id --operation Merge --tags @TagList --output none 2>$null
+                    }
+                    az storage account update --subscription $Sub --resource-group $Rg --name $account.name --allow-shared-key-access true --public-network-access Enabled --default-action Allow --output none 2>$null
+                }
+            }
+            catch { }
+            Start-Sleep -Seconds 5
+        }
+    } -ArgumentList $Subscription, $Group, $tagArgs, @($Tags.Keys)
 }
 
 function Get-HubResourceIds($Outputs, [hashtable] $TemplateValues) {
@@ -1838,6 +1877,7 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
     $vnetName = $VirtualNetworkName
     $vnetGroup = $VirtualNetworkResourceGroupName
     $vnetSubscription = $VirtualNetworkSubscriptionId
+    if (-not $UsePublicNetworking) {
     if (-not ($vnetName -and $vnetGroup)) {
         $query = "resources | where type =~ 'microsoft.network/virtualnetworks' | where tostring(tags['ftk-tool']) != 'FinOps hubs' | project id, name, subscriptionId, location, prefixes = properties.addressSpace.addressPrefixes"
         $vnets = @(Invoke-ResourceGraph $query | Where-Object {
@@ -1870,8 +1910,10 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
         $subnetLabels = @($subnets | ForEach-Object { '{0,-32} {1,-18} ~{2} free IPs{3}' -f $_.Name, $_.Prefix, $_.Free, $(if ($_.Free -lt 8) { '  (too small)' } else { '' }) })
         $answers['PrivateEndpointSubnetName'] = (Read-Selection -Title "Subnet in $vnetName for the private endpoints (about 5 IP addresses are used)" -Items $subnets -Labels $subnetLabels).Name
     }
+    }
 
-    $vnetRegion = ([string]$vnet.location).ToLowerInvariant().Replace(' ', '')
+    # Public networking has no virtual network to anchor the region; start the region search from a common default.
+    $vnetRegion = if ($UsePublicNetworking) { 'eastus2' } else { ([string]$vnet.location).ToLowerInvariant().Replace(' ', '') }
     $hubRegion = $Location.ToLowerInvariant().Replace(' ', '')
     if (-not $hubRegion) {
         # The hub and the Fabric capacity share one region, which must offer Fabric and have capacity quota.
@@ -1919,7 +1961,8 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
                 $suggestion = $candidates[0]
                 Write-Info "Nearest regions with Fabric capacity quota: $($candidates -join ', ')"
             }
-            $hubRegion = (Read-Text -Prompt "Azure region for the hub and the Fabric capacity (the virtual network is in $vnetRegion)" -Default $suggestion -Validate {
+            $regionPrompt = if ($UsePublicNetworking) { 'Azure region for the hub and the Fabric capacity' } else { "Azure region for the hub and the Fabric capacity (the virtual network is in $vnetRegion)" }
+            $hubRegion = (Read-Text -Prompt $regionPrompt -Default $suggestion -Validate {
                     param($value)
                     $name = $value.ToLowerInvariant().Replace(' ', '')
                     if ($regions.Count -gt 0 -and $regions -notcontains $name) { return "Unknown region '$value' (example: swedencentral)." }
@@ -1983,10 +2026,17 @@ Start-Transcript -Path (Join-Path $logDirectory "Deploy-FinOpsHub-V3-Fabric-$run
 $overallStart = Get-Date
 try {
     Write-Banner
+    if ($UsePublicNetworking) {
+        # Public networking: no private DNS, and Data Factory stays reachable (it has no private endpoints).
+        $SkipPrivateDnsZones = $true
+        $AllowDataFactoryPublicAccess = $true
+        if ($VirtualNetworkName -or $VirtualNetworkResourceGroupName -or $PrivateEndpointSubnetName) { Write-Warn '-UsePublicNetworking: the virtual network and subnet parameters are ignored.' }
+    }
 
     # --- 1. Pre-flight -------------------------------------------------------------------------------------
     Write-Step 'Pre-flight checks'
-    $missing = @('SubscriptionId', 'ResourceGroupName', 'VirtualNetworkName', 'VirtualNetworkResourceGroupName', 'PrivateEndpointSubnetName' | Where-Object { -not (Get-Variable -Name $_ -ValueOnly) })
+    $required = if ($UsePublicNetworking) { @('SubscriptionId', 'ResourceGroupName') } else { @('SubscriptionId', 'ResourceGroupName', 'VirtualNetworkName', 'VirtualNetworkResourceGroupName', 'PrivateEndpointSubnetName') }
+    $missing = @($required | Where-Object { -not (Get-Variable -Name $_ -ValueOnly) })
     $guided = $missing.Count -gt 0
     if ($guided -and -not (Test-CanPrompt)) {
         throw "Missing parameter(s): -$($missing -join ', -'). Pass them (see Get-Help $PSCommandPath -Full) or run the script in an interactive PowerShell session for guided setup."
@@ -1994,7 +2044,9 @@ try {
     if (-not (Get-Command az -ErrorAction SilentlyContinue)) { throw 'Azure CLI (az) is not installed. See https://aka.ms/azcli.' }
     $ingestionScript = Join-Path $FabricSetupScriptFolder 'finops-hub-fabric-setup-Ingestion.kql'
     $hubScript = Join-Path $FabricSetupScriptFolder 'finops-hub-fabric-setup-Hub.kql'
-    foreach ($file in @($TemplateFile, $TemplateParameterFile, (Join-Path $PSScriptRoot 'modules/private-endpoints.json'), (Join-Path $PSScriptRoot 'modules/private-dns-zones.json'), $ingestionScript, $hubScript)) {
+    $subscriptionTagsScript = Join-Path $PSScriptRoot 'fabric/finops-hub-subscription-tags.kql'
+    $subscriptionTagsRefresh = Join-Path $PSScriptRoot 'Update-SubscriptionTagInventory.ps1'
+    foreach ($file in @($TemplateFile, $TemplateParameterFile, (Join-Path $PSScriptRoot 'modules/private-endpoints.json'), (Join-Path $PSScriptRoot 'modules/private-dns-zones.json'), $ingestionScript, $hubScript, $subscriptionTagsScript, $subscriptionTagsRefresh)) {
         if (-not (Test-Path $file)) { throw "Required file not found: $file (the Fabric setup scripts are FinOps toolkit release assets: https://github.com/microsoft/finops-toolkit/releases)" }
     }
     if (-not $SkipDashboard -and -not (Test-Path $DashboardFile)) { throw "Dashboard file not found: $DashboardFile" }
@@ -2123,6 +2175,11 @@ try {
     }
     else { Write-Ok "Fabric workspace '$FabricWorkspaceName' will be created (eventhouse '$FabricEventhouseName', databases Ingestion + Hub)" }
 
+    $vnet = $null
+    $subnet = $null
+    $dnsPlan = @()
+    if ($UsePublicNetworking) { Write-Ok 'Public networking: no virtual network, private endpoints or private DNS will be created' }
+    else {
     $vnetPath = "/subscriptions/$VirtualNetworkSubscriptionId/resourceGroups/$VirtualNetworkResourceGroupName/providers/Microsoft.Network/virtualNetworks/$VirtualNetworkName"
     $vnetResponse = Invoke-Arm -Path "$vnetPath`?api-version=2024-05-01" -AllowNotFound
     if (-not $vnetResponse) { throw "Virtual network $VirtualNetworkName was not found in resource group $VirtualNetworkResourceGroupName (subscription $VirtualNetworkSubscriptionId)." }
@@ -2162,10 +2219,11 @@ try {
             Write-Info ("  {0,-42} {1,-7} {2}" -f $zone.Name, $zone.Action.ToLowerInvariant(), $where)
         }
     }
+    }
 
     $hubScope = if (Invoke-Arm -Path "/subscriptions/$SubscriptionId/resourcegroups/$ResourceGroupName`?api-version=2021-04-01" -AllowNotFound) { "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName" } else { "/subscriptions/$SubscriptionId" }
     $capacityScope = if (Invoke-Arm -Path "/subscriptions/$SubscriptionId/resourcegroups/$capacityGroup`?api-version=2021-04-01" -AllowNotFound) { "/subscriptions/$SubscriptionId/resourceGroups/$capacityGroup" } else { "/subscriptions/$SubscriptionId" }
-    $peScope = if (Invoke-Arm -Path "/subscriptions/$VirtualNetworkSubscriptionId/resourcegroups/$PrivateEndpointResourceGroupName`?api-version=2021-04-01" -AllowNotFound) { "/subscriptions/$VirtualNetworkSubscriptionId/resourceGroups/$PrivateEndpointResourceGroupName" } else { "/subscriptions/$VirtualNetworkSubscriptionId" }
+    $peScope = if ($UsePublicNetworking) { $hubScope } elseif (Invoke-Arm -Path "/subscriptions/$VirtualNetworkSubscriptionId/resourcegroups/$PrivateEndpointResourceGroupName`?api-version=2021-04-01" -AllowNotFound) { "/subscriptions/$VirtualNetworkSubscriptionId/resourceGroups/$PrivateEndpointResourceGroupName" } else { "/subscriptions/$VirtualNetworkSubscriptionId" }
     $requiredPermissions = [System.Collections.Generic.List[object]]::new()
     $require = {
         param([string] $Scope, [string] $Action, [string] $Why)
@@ -2175,9 +2233,11 @@ try {
     & $require $hubScope 'Microsoft.Authorization/roleAssignments/write' 'grant hub managed identities access (Owner or User Access Administrator)'
     & $require $hubScope 'Microsoft.Storage/storageAccounts/write' 'set the storage firewall for Fabric ingestion'
     & $require $capacityScope 'Microsoft.Fabric/capacities/write' 'create or update the Fabric capacity'
-    & $require $subnet.id 'Microsoft.Network/virtualNetworks/subnets/join/action' 'place private endpoints in the subnet'
-    & $require $peScope 'Microsoft.Network/privateEndpoints/write' 'create private endpoints'
-    & $require $peScope 'Microsoft.Resources/deployments/write' 'deploy the private endpoints'
+    if (-not $UsePublicNetworking) {
+        & $require $subnet.id 'Microsoft.Network/virtualNetworks/subnets/join/action' 'place private endpoints in the subnet'
+        & $require $peScope 'Microsoft.Network/privateEndpoints/write' 'create private endpoints'
+        & $require $peScope 'Microsoft.Resources/deployments/write' 'deploy the private endpoints'
+    }
     $dnsScope = "/subscriptions/$PrivateDnsZoneSubscriptionId/resourceGroups/$PrivateDnsZoneResourceGroupName"
     foreach ($zone in $dnsPlan) {
         $zoneScope = if ($zone.Action -eq 'Create') { $dnsScope } else { $zone.Id }
@@ -2193,7 +2253,7 @@ try {
     if ($missingPermissions.Count -gt 0) {
         throw "Missing permissions: " + (($missingPermissions | ForEach-Object { "$($_.Action) on $($_.Scope) (to $($_.Why))" }) -join '; ')
     }
-    Write-Ok "Permissions verified ($($requiredPermissions.Count) checks: deployments, role assignments, storage, Fabric capacity, subnet, private endpoints$(if ($dnsPlan.Count) { ', private DNS zones and links' }))"
+    Write-Ok "Permissions verified ($($requiredPermissions.Count) checks: deployments, role assignments, storage, Fabric capacity$(if (-not $UsePublicNetworking) { ', subnet, private endpoints' })$(if ($dnsPlan.Count) { ', private DNS zones and links' }))"
 
     if ($guided) {
         $planScopes = if ($SkipExports) { 0 } elseif ($ExportScopes) { @($ExportScopes).Count } else { @(Get-DefaultExportScopes).Count }
@@ -2203,12 +2263,15 @@ try {
         Write-Info "FinOps hub:        $($templateValues['hubName']) in resource group $ResourceGroupName ($hubLocation), subscription '$($account.name)'"
         Write-Info "Fabric capacity:   $FabricCapacityName $FabricCapacitySku ($capacityUnits CU) in $capacityGroup - $(Format-FabricCost -Price $fabricPrice -Units $capacityUnits) while active$(if ($existingCapacity) { ' (existing)' })"
         Write-Info "Fabric workspace:  $FabricWorkspaceName - eventhouse $FabricEventhouseName with the Ingestion and Hub databases, real-time dashboard"
-        Write-Info "Private endpoints: $VirtualNetworkName / $PrivateEndpointSubnetName (endpoint resources in $PrivateEndpointResourceGroupName)"
-        $dnsSummary = if ($SkipPrivateDnsZones) { 'not managed by this script' } else {
-            '{0} already linked (reused); {1} to link and {2} to create in {3} (subscription {4})' -f @($dnsPlan | Where-Object Action -eq 'Reuse').Count,
-            @($dnsPlan | Where-Object Action -eq 'Link').Count, @($dnsPlan | Where-Object Action -eq 'Create').Count, $PrivateDnsZoneResourceGroupName, $PrivateDnsZoneSubscriptionId
+        if ($UsePublicNetworking) { Write-Info 'Networking:        public (no virtual network, private endpoints or private DNS)' }
+        else {
+            Write-Info "Private endpoints: $VirtualNetworkName / $PrivateEndpointSubnetName (endpoint resources in $PrivateEndpointResourceGroupName)"
+            $dnsSummary = if ($SkipPrivateDnsZones) { 'not managed by this script' } else {
+                '{0} already linked (reused); {1} to link and {2} to create in {3} (subscription {4})' -f @($dnsPlan | Where-Object Action -eq 'Reuse').Count,
+                @($dnsPlan | Where-Object Action -eq 'Link').Count, @($dnsPlan | Where-Object Action -eq 'Create').Count, $PrivateDnsZoneResourceGroupName, $PrivateDnsZoneSubscriptionId
+            }
+            Write-Info "Private DNS zones: $dnsSummary"
         }
-        Write-Info "Private DNS zones: $dnsSummary"
         Write-Info "Cost exports:      $exportPlan"
         Write-Info "Storage firewall:  $(if ($KeepStorageFirewallClosed) { 'kept closed (-KeepStorageFirewallClosed): data will not reach Fabric' } else { 'allows all networks with Entra ID/RBAC (required for Fabric ingestion)' })"
         Write-Info 'Duration:          about 35-60 minutes'
@@ -2241,7 +2304,7 @@ try {
     $ingestionDatabase = Set-FabricKqlDatabase -WorkspaceId $workspaceId -EventhouseId $eventhouse.id -Name 'Ingestion'
     $hubDatabase = Set-FabricKqlDatabase -WorkspaceId $workspaceId -EventhouseId $eventhouse.id -Name 'Hub'
     $setupResults = [System.Collections.Generic.List[object]]::new()
-    foreach ($setup in @(@{ Database = 'Ingestion'; Path = $ingestionScript }, @{ Database = 'Hub'; Path = $hubScript })) {
+    foreach ($setup in @(@{ Database = 'Ingestion'; Path = $ingestionScript }, @{ Database = 'Hub'; Path = $hubScript }, @{ Database = 'Hub'; Path = $subscriptionTagsScript })) {
         Write-Info "Running $(Split-Path $setup.Path -Leaf) in the $($setup.Database) database (raw retention $rawRetentionInDays day(s))..."
         $result = Invoke-FabricSetupScript -QueryUri $queryUri -Database $setup.Database -ScriptPath $setup.Path -RawRetentionInDays $rawRetentionInDays
         $setupResults.Add($result)
@@ -2251,7 +2314,7 @@ try {
     $templateValues['fabricQueryUri'] = $queryUri
 
     # --- 4. FinOps hub template ----------------------------------------------------------------------------
-    Write-Step 'Deploying the FinOps hub template (private access, Fabric data store)'
+    Write-Step "Deploying the FinOps hub template ($(if ($UsePublicNetworking) { 'public access' } else { 'private access' }), Fabric data store)"
     if ($SkipHubDeployment) {
         $previous = @(Get-ArmList "/subscriptions/$SubscriptionId/resourcegroups/$ResourceGroupName/providers/Microsoft.Resources/deployments?api-version=2024-03-01" |
             Where-Object { $_.name -like "$script:DeploymentPrefix-*" -and $_.properties.provisioningState -eq 'Succeeded' } |
@@ -2262,11 +2325,19 @@ try {
     }
     else {
         if (-not $templateValues['fabricQueryUri']) { throw 'The eventhouse query URI is missing; the template cannot be deployed without it.' }
-        Write-Info 'This takes 20-35 minutes (private networking, deployment scripts).'
+        Write-Info $(if ($UsePublicNetworking) { 'This takes 10-20 minutes.' } else { 'This takes 20-35 minutes (private networking, deployment scripts).' })
         $templateJson = ConvertTo-Minified (Get-Content -Path $TemplateFile -Raw)
+        $tagWatcher = $null
+        if ($ScriptStorageTags.Count -gt 0) {
+            $tagWatcher = Start-StorageTagWatcher -Subscription $SubscriptionId -Group $ResourceGroupName -Tags $ScriptStorageTags
+            Write-Info "Tagging storage accounts in $ResourceGroupName with $(($ScriptStorageTags.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ') and enabling key access while the template deploys."
+        }
+        try {
         $hubDeployment = Invoke-GroupDeployment -Subscription $SubscriptionId -ResourceGroup $ResourceGroupName -NamePrefix $script:DeploymentPrefix `
             -TemplateJson $templateJson -Parameters ([hashtable]$templateValues) -MaxAttempts $MaxDeploymentAttempts -TimeoutMinutes 180 -ShowNestedProgress -ResumeRunning `
             -BeforeAttempt { Clear-HubDeploymentScripts -Subscription $SubscriptionId -ResourceGroup $ResourceGroupName }
+        }
+        finally { if ($tagWatcher) { Stop-Job $tagWatcher -ErrorAction SilentlyContinue; Remove-Job $tagWatcher -Force -ErrorAction SilentlyContinue } }
     }
     $hub = Get-HubResourceIds -Outputs $hubDeployment.Outputs -TemplateValues ([hashtable]$templateValues)
     if (-not $hub.StorageId) { throw 'The deployment outputs do not contain the storage account.' }
@@ -2275,9 +2346,13 @@ try {
     Write-Ok "Storage: $($hub.StorageName) | Data Factory: $($hub.DataFactoryName) | data store: $queryUri"
 
     # --- 5. Private endpoints ------------------------------------------------------------------------------
-    Write-Step "Private endpoints in $VirtualNetworkName/$PrivateEndpointSubnetName"
-    $privateEndpoints = @(Set-HubPrivateEndpoints -Hub $hub -VirtualNetwork $vnet -SubnetId $subnet.id -VnetSubscription $VirtualNetworkSubscriptionId `
-            -EndpointResourceGroup $PrivateEndpointResourceGroupName -DnsSubscription $PrivateDnsZoneSubscriptionId -DnsResourceGroup $PrivateDnsZoneResourceGroupName -ResourceTags $resourceTags)
+    $privateEndpoints = @()
+    if ($UsePublicNetworking) { Write-Step 'Private endpoints (skipped: public networking)' }
+    else {
+        Write-Step "Private endpoints in $VirtualNetworkName/$PrivateEndpointSubnetName"
+        $privateEndpoints = @(Set-HubPrivateEndpoints -Hub $hub -VirtualNetwork $vnet -SubnetId $subnet.id -VnetSubscription $VirtualNetworkSubscriptionId `
+                -EndpointResourceGroup $PrivateEndpointResourceGroupName -DnsSubscription $PrivateDnsZoneSubscriptionId -DnsResourceGroup $PrivateDnsZoneResourceGroupName -ResourceTags $resourceTags)
+    }
     foreach ($endpoint in $privateEndpoints) {
         Write-Ok "$($endpoint.Name) [$($endpoint.GroupId)] $($endpoint.Status)"
         foreach ($record in $endpoint.Records) { Write-Info "      $record" }
@@ -2289,7 +2364,7 @@ try {
         Invoke-Arm -Method PATCH -Path "$($hub.DataFactoryId)?api-version=2018-06-01" -Body @{ properties = @{ publicNetworkAccess = 'Disabled' } } -RetryOnConflict | Out-Null
         Write-Ok 'Data Factory public network access disabled (self-hosted integration runtime traffic only through private link)'
     }
-    else { Write-Info 'Data Factory public network access left enabled (-AllowDataFactoryPublicAccess).' }
+    else { Write-Info $(if ($UsePublicNetworking) { 'Data Factory public network access left enabled (public networking).' } else { 'Data Factory public network access left enabled (-AllowDataFactoryPublicAccess).' }) }
     $storageAccess = Set-FabricStorageAccess -Hub $hub -WorkspaceId $workspaceId -KeepFirewallClosed:$KeepStorageFirewallClosed
     $storageAccessUtc = [DateTime]::UtcNow
     $fabricRuleId = $storageAccess.RuleId
@@ -2298,7 +2373,8 @@ try {
     $firewallText = "default action $(Get-Value $storage 'properties.networkAcls.defaultAction'), bypass $(Get-Value $storage 'properties.networkAcls.bypass'), Fabric workspace rule $(if ($fabricRuleCount) { 'present' } else { 'MISSING' })"
     if ($KeepStorageFirewallClosed) { Write-Warn "Storage firewall kept closed (-KeepStorageFirewallClosed): $firewallText. Fabric eventhouses cannot load data through a storage firewall, so cost data will stay in storage." }
     else { Write-Ok "Storage firewall: $firewallText. All networks are allowed (Entra ID/RBAC still required) because Fabric eventhouse ingestion cannot pass a storage firewall." }
-    foreach ($managed in @(Sync-ManagedPrivateEndpoints -Hub $hub)) {
+    $managedList = if ($UsePublicNetworking) { @() } else { @(Sync-ManagedPrivateEndpoints -Hub $hub) }
+    foreach ($managed in $managedList) {
         $note = if ($managed.FactoryStatus -ne $managed.Status) { " (Data Factory still shows '$($managed.FactoryStatus)'; the target resource is authoritative)" } else { '' }
         if ($managed.Status -eq 'Approved') { Write-Ok "Data Factory managed private endpoint to $($managed.Target): Approved$note" }
         else { Write-Warn "Data Factory managed private endpoint to $($managed.Target): $($managed.Status)$note" }
@@ -2333,8 +2409,18 @@ try {
     # --- 9. Dashboard -------------------------------------------------------------------------------------------
     Write-Step 'Fabric real-time dashboard'
     $dashboard = $null
+    $subscriptionTagSnapshot = $null
+    $subscriptionTagSnapshotError = ''
     if ($SkipDashboard) { Write-Info 'Skipped (-SkipDashboard).' }
     else {
+        try {
+            $subscriptionTagSnapshot = & $subscriptionTagsRefresh -QueryUri $queryUri
+            Write-Ok "Tag inventory: $($subscriptionTagSnapshot.Subscriptions) subscription(s), $($subscriptionTagSnapshot.Resources) resource(s), snapshot $($subscriptionTagSnapshot.SnapshotAt)"
+        }
+        catch {
+            $subscriptionTagSnapshotError = $_.Exception.Message
+            Write-Warn "Tag/resource inventory refresh failed: $subscriptionTagSnapshotError. Exported resource/cost tags remain available; subscription tags and current resource inventory may be missing or stale. Use Update-SubscriptionTagInventory.ps1 to retry."
+        }
         try {
             $dashboard = Import-FabricDashboard -WorkspaceId $workspaceId -QueryUri $queryUri -HubDatabaseId $hubDatabase.id -Title "FinOps hub - $($templateValues['hubName'])"
             Write-Info "Tiles: $($dashboard.Tiles) | connected to the Hub database: $($dashboard.Connected)"
@@ -2352,7 +2438,7 @@ try {
     $workspaceNow = Invoke-Fabric -Path "/workspaces/$workspaceId"
     $checks.Add([pscustomobject]@{ Check = 'Fabric workspace on the capacity'; Result = $FabricWorkspaceName; Pass = ((Get-Value $workspaceNow 'capacityId' '') -eq $capacityGuid) })
     $checks.Add([pscustomobject]@{ Check = 'Fabric workspace identity'; Result = $workspaceIdentity.ApplicationId; Pass = [bool]$workspaceIdentity.ServicePrincipalId })
-    $schemaOk = @($setupResults | Where-Object { $_.Failed -eq 0 -and $_.Commands -gt 0 }).Count -eq 2
+    $schemaOk = $setupResults.Count -gt 0 -and @($setupResults | Where-Object { $_.Failed -eq 0 -and $_.Commands -gt 0 }).Count -eq $setupResults.Count
     $checks.Add([pscustomobject]@{ Check = 'Ingestion and Hub database schema'; Result = (($setupResults | ForEach-Object { "$($_.Database): $($_.Commands) commands" }) -join ', '); Pass = $schemaOk })
     $adminOk = @($adminResults | Where-Object Admin).Count -eq 2
     $checks.Add([pscustomobject]@{ Check = 'Data Factory admin of both databases'; Result = (($adminResults | ForEach-Object { "$($_.Database)=$($_.Admin)" }) -join ', '); Pass = $adminOk })
@@ -2373,15 +2459,17 @@ try {
     $factory = (Invoke-Arm -Path "$($hub.DataFactoryId)?api-version=2018-06-01").Content
     $factoryAccess = Get-Value $factory 'properties.publicNetworkAccess' 'Enabled'
     $checks.Add([pscustomobject]@{ Check = 'Data Factory public access'; Result = $factoryAccess; Pass = ($AllowDataFactoryPublicAccess -or $factoryAccess -eq 'Disabled') })
-    $approved = @($privateEndpoints | Where-Object Status -eq 'Approved').Count
-    $checks.Add([pscustomobject]@{ Check = 'Private endpoints approved'; Result = "$approved of $($privateEndpoints.Count)"; Pass = ($approved -eq $privateEndpoints.Count) })
-    if (-not $SkipPrivateDnsZones) {
-        $dnsIssueCount = @($privateEndpoints | ForEach-Object { $_.DnsIssues }).Count
-        $checks.Add([pscustomobject]@{ Check = 'Private DNS records point to endpoints'; Result = $(if ($dnsIssueCount) { "$dnsIssueCount issue(s)" } else { 'all records OK' }); Pass = ($dnsIssueCount -eq 0) })
+    if (-not $UsePublicNetworking) {
+        $approved = @($privateEndpoints | Where-Object Status -eq 'Approved').Count
+        $checks.Add([pscustomobject]@{ Check = 'Private endpoints approved'; Result = "$approved of $($privateEndpoints.Count)"; Pass = ($approved -eq $privateEndpoints.Count) })
+        if (-not $SkipPrivateDnsZones) {
+            $dnsIssueCount = @($privateEndpoints | ForEach-Object { $_.DnsIssues }).Count
+            $checks.Add([pscustomobject]@{ Check = 'Private DNS records point to endpoints'; Result = $(if ($dnsIssueCount) { "$dnsIssueCount issue(s)" } else { 'all records OK' }); Pass = ($dnsIssueCount -eq 0) })
+        }
+        $managedEndpoints = @(Sync-ManagedPrivateEndpoints -Hub $hub)
+        $managedApproved = @($managedEndpoints | Where-Object Status -eq 'Approved').Count
+        $checks.Add([pscustomobject]@{ Check = 'Data Factory managed private endpoints'; Result = "$managedApproved of $($managedEndpoints.Count) approved ($(($managedEndpoints | ForEach-Object { $_.Target }) -join ', '))"; Pass = ($managedEndpoints.Count -gt 0 -and $managedApproved -eq $managedEndpoints.Count) })
     }
-    $managedEndpoints = @(Sync-ManagedPrivateEndpoints -Hub $hub)
-    $managedApproved = @($managedEndpoints | Where-Object Status -eq 'Approved').Count
-    $checks.Add([pscustomobject]@{ Check = 'Data Factory managed private endpoints'; Result = "$managedApproved of $($managedEndpoints.Count) approved ($(($managedEndpoints | ForEach-Object { $_.Target }) -join ', '))"; Pass = ($managedEndpoints.Count -gt 0 -and $managedApproved -eq $managedEndpoints.Count) })
     $triggers = @(Get-ArmList "$($hub.DataFactoryId)/triggers?api-version=2018-06-01")
     $started = @($triggers | Where-Object { (Get-Value $_ 'properties.runtimeState') -eq 'Started' }).Count
     $checks.Add([pscustomobject]@{ Check = 'Data Factory triggers started'; Result = "$started of $($triggers.Count)"; Pass = ($started -gt 0) })
@@ -2390,6 +2478,7 @@ try {
         $checks.Add([pscustomobject]@{ Check = 'Export scopes configured'; Result = "$okScopes of $($exportResults.Count)"; Pass = ($okScopes -eq $exportResults.Count -and $okScopes -gt 0) })
     }
     if (-not $SkipDashboard) {
+        $checks.Add([pscustomobject]@{ Check = 'Tag and resource inventory snapshots refreshed'; Result = $(if ($subscriptionTagSnapshot) { "$($subscriptionTagSnapshot.Subscriptions) subscription(s), $($subscriptionTagSnapshot.Resources) resource(s), $($subscriptionTagSnapshot.SnapshotAt)" } else { $subscriptionTagSnapshotError }); Pass = [bool]$subscriptionTagSnapshot })
         $checks.Add([pscustomobject]@{ Check = 'Fabric dashboard imported'; Result = $(if ($dashboard) { "$($dashboard.Tiles) tiles, Hub connected: $($dashboard.Connected)" } else { 'failed' }); Pass = ([bool]$dashboard -and $dashboard.Connected -and $dashboard.Tiles -gt 0) })
     }
     foreach ($check in $checks) {
@@ -2431,6 +2520,7 @@ try {
         privateEndpoints = $privateEndpoints
         exports          = $exportResults
         dashboard        = $dashboard
+        subscriptionTags = @{ snapshot = $subscriptionTagSnapshot; error = $subscriptionTagSnapshotError }
         checks           = $checks
         warnings         = $script:Warnings
     }

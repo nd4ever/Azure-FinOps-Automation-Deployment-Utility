@@ -66,7 +66,7 @@ The **Azure FinOps Workspace** is a fully automated, end-to-end deployment of th
 | Private networking | Private endpoints in **your** virtual network for storage, Data Factory, Data Factory Studio and Key Vault (when the hub has one), with private DNS zones reused, linked or created |
 | Access | Microsoft Entra ID sign-in and role-based access for people and services, with no anonymous access |
 
-It automates every step of the official [FinOps hub deployment guide](https://learn.microsoft.com/cloud-computing/finops/toolkit/hubs/deploy), including the optional "Set up Microsoft Fabric" and "Configure Fabric access" sections, and then checks the result with up to 16 verification tests. A typical run takes 35 to 60 minutes, and nothing needs to be done by hand afterwards.
+It automates every step of the official [FinOps hub deployment guide](https://learn.microsoft.com/cloud-computing/finops/toolkit/hubs/deploy), including the optional "Set up Microsoft Fabric" and "Configure Fabric access" sections, and then checks the result with up to 17 verification tests. A typical run takes 35 to 60 minutes, and nothing needs to be done by hand afterwards.
 
 **Scope:** Azure public cloud, and the subscriptions in the tenant you sign in to (by default, every enabled subscription you can see). Azure Data Explorer is not deployed, because Fabric is the data store.
 
@@ -89,6 +89,7 @@ Some of the problems it solves for you:
 ## What end users get
 
 - **A live FinOps dashboard in Microsoft Fabric**, with the FinOps toolkit pages: Summary, Anomaly management, Data ingestion, Rate optimization, Licensing + SaaS, Budgeting, and Invoicing + chargeback.
+- **Subscription costs by tag**, with multi-select subscription/tag filters, subscription cross-filtering, and resource detail including current ARM resources without exported costs.
 - **Cost data that stays current on its own.** New costs arrive every day, and each closed month is finalized automatically.
 - **One trusted dataset for every subscription**, aligned with the FinOps Open Cost and Usage Specification (FOCUS). Query it with KQL (for example `Costs()` in the Hub database), connect Power BI to it, or use it from your own tools.
 - **Copilot in Fabric** (optional): ask questions about cost data in plain language. See [Copilot in Fabric](#copilot-in-fabric).
@@ -162,11 +163,11 @@ The script runs ten steps. All of them are idempotent: running the script again 
 | 6. Network hardening | Disables Data Factory public network access and configures storage access for Fabric ingestion. |
 | 7. Fabric access | Makes Data Factory admin of both databases, gives your viewers access to the workspace, re-runs the hub initialization and re-queues loads that failed. |
 | 8. Cost exports | Creates the daily and monthly FOCUS exports in every subscription and backfills 12 months of history. |
-| 9. Dashboard | Imports the FinOps hub dashboard into Fabric and connects it to the Hub database. |
+| 9. Dashboard | Refreshes subscription tags and current ARM resource inventory, imports the FinOps hub dashboard into Fabric and connects it to the Hub database. |
 | 10. Verification | Runs the checks below and writes a JSON summary to `./logs`. |
 
 <details>
-<summary><b>The 16 verification checks</b></summary>
+<summary><b>The 17 verification checks</b></summary>
 
 1. Fabric capacity is active
 2. Fabric workspace is on the capacity
@@ -184,6 +185,7 @@ The script runs ten steps. All of them are idempotent: running the script again 
 14. Data Factory triggers are started
 15. Cost exports are configured for every scope (skipped with `-SkipExports`)
 16. The Fabric dashboard is imported and connected (skipped with `-SkipDashboard`)
+17. Tag and resource inventory snapshots refreshed (skipped with `-SkipDashboard`; a failure is reported separately from dashboard import)
 
 </details>
 
@@ -207,8 +209,9 @@ The script runs ten steps. All of them are idempotent: running the script again 
 | Virtual network and the private endpoint resource group | Network Contributor | Place the private endpoints in your subnet |
 | Private DNS zone resource group | Private DNS Zone Contributor (plus Network Contributor on the virtual network to link zones) | Create or link zones and register the records |
 | Every subscription to export | Cost Management Contributor, or higher | Create the exports |
+| Every subscription in the inventory snapshots | Subscription-wide Reader | Read subscription tags and list current ARM resources; a collection failure is reported explicitly and preserves previous snapshots |
 
-The pre-flight step tests each of these permissions. If anything is missing, it stops before deploying and lists the exact action and scope that is needed.
+The pre-flight step tests deployment permissions and stops before deploying when they are missing, listing the required action and scope. Subscription-tag and resource-list access is checked during inventory refresh; a failure is reported separately and does not prevent dashboard import.
 
 ### Microsoft Fabric
 
@@ -436,6 +439,50 @@ Copilot works on paid Fabric capacities (F2 and larger, but not trial capacities
 - Cost Management runs the daily export (month to date) every day, and the monthly export (the closed previous month) around the 5th of each month.
 - The exports are named `ftk-<storage account>-daily` and `ftk-<storage account>-monthly`, and they are scheduled for 5 years.
 - The hub pipelines load every export run into Fabric automatically, and the dashboard always shows live data.
+- Subscription-level tags and current ARM resource inventory are separate snapshots refreshed during deployment or with `Update-SubscriptionTagInventory.ps1`; daily cost exports do not refresh them.
+
+### Subscription costs by tag
+
+Open **Subscription costs by tag** in the Fabric dashboard. The page has these filters:
+
+| Filter | Behavior |
+|---|---|
+| Tag cost period | Charge-period start dates in the selected range, start inclusive and end exclusive; defaults to the last 30 days. This page does not use the monthly/daily trend or group-count controls. |
+| Currency | Uses the existing dashboard currency filter. If all currencies are selected, costs remain separate by currency; no conversion or cross-currency total is performed. |
+| Tag source | **Resource/cost tags**, **Subscription tags**, or **Both**. Both displays the sources separately rather than merging or inheriting tags. |
+| Subscriptions | Multi-select by subscription name and unique ID. Includes enabled subscriptions in the inventory, including those without exported cost records, and subscriptions found in the period's cost data. |
+| Tag names (multi-select) | Check several names in the **top filter bar**, not the table's `TagName` column funnel. Choices follow the source and subscription filters. Untagged entries have a separate **(No tags) - untagged** choice. |
+| Tag values (name = value) | Multi-select exact source/name/value pairs. Identical values on different tag names or sources are not cross-matched. Options reset when their upstream selections no longer apply. |
+
+The detailed table contains **subscription name and ID, tag source, name, value, billing currency, billed cost, effective cost, cost-record count, data status, and subscription-tag snapshot time**. Empty tag values are preserved. Names and values retain their exported spelling and match exactly.
+
+Table column funnels are independent, table-local filters. Clear an existing `TagName` funnel if it hides names selected in the top multi-select control. Select **All** to clear the top selection; multiple names match independently (OR), not a requirement that every name exists on a resource.
+
+To inspect a subscription, right-click its **SubscriptionId** cell in either subscription table and choose **Cross-filter**. The top subscription selection updates and filters all three tables. Use **Reset** on that visual or change the top **Subscriptions** selector to restore the broader view. Fabric's row-expansion arrow displays record fields; it is not a subscription/resource hierarchy.
+
+The **Resource detail** table below the subscription tables uses the same source, subscription, tag-name, tag-pair, date and currency filters. It includes current resources returned by the subscription-level **Azure Resource Manager Resources List** API even if they have no exported costs. This is ARM inventory, not an inventory of data-plane objects (such as blobs or database rows), and does not guarantee enumeration of every provider-specific child object. Resources in historical cost records but absent from the current snapshot remain visible and are labeled **Not in current inventory (deleted, inaccessible, or stale snapshot)**. Charges with no resource ID are retained as **(Charges without resource ID)**.
+
+Resource detail shows matching-tag billed/effective costs, full-resource billed/effective costs, resource name/ID/group/type/location, current resource tags, inventory status and snapshot times. **Both full-resource and matching-tag values can repeat across tag rows and sources; do not add those rows together.** Resource/cost attribution uses historical exported tags when cost records exist. Only resources without cost records use their current ARM tags for tag selection, labeled by **TagBasis**. Current resource tags are also displayed separately for cost-bearing resources; they are not retroactively applied to historical charges. Subscription tags repeat each resource's full period cost and are labeled **not resource inheritance**. Missing cost records are explicit, not proof of zero Azure spend.
+
+**Tag rows overlap and must not be added together.** For example, a cost record with both `Environment=Prod` and `CostCenter=Finance` contributes to both rows. Resource/cost tags attribute only the matching cost records; subscription tags attribute the subscription's **entire period cost** to each selected current subscription tag. The **Matching subscriptions** table calculates each matching subscription's full period costs directly from the original records once per currency, not by summing tag rows. It is a full-subscription total, not a sum of only the tagged resources.
+
+Subscriptions without cost records in the selected period/currency are explicitly labeled; a zero in that case is **not** proof of no Azure spend. Resource/cost tags reflect the imported cost records (including any Cost Management tag inheritance already present in those exports). Subscription-level tags reflect the latest snapshot, not historical tags or automatic inheritance.
+
+The snapshot status table displays both inventory ages and flags snapshots older than 24 hours, including resource counts. To refresh tags and resources without redeploying resources or changing exports:
+
+```powershell
+./Update-SubscriptionTagInventory.ps1 `
+    -QueryUri 'https://<eventhouse-query-host>.kusto.fabric.microsoft.com'
+
+# Optional: replace the snapshot with only these subscriptions.
+./Update-SubscriptionTagInventory.ps1 `
+    -QueryUri 'https://<eventhouse-query-host>.kusto.fabric.microsoft.com' `
+    -SubscriptionIds '<subscription-guid-1>', '<subscription-guid-2>'
+```
+
+Use the **query service URI** from the deployment summary, not an ingestion endpoint. The default database name is `Hub` (`-Database` accepts a database name, not a Fabric item GUID). The signed-in Azure CLI identity needs subscription-wide **Reader** access (including `Microsoft.Resources/tags/read` and resource listing) on every selected subscription and write/query access to the Hub KQL database. The refresh reads Azure tags/resources but **never changes them**. It follows every resource-list page and collects both inventories completely before any write; a collection failure preserves both previous snapshots. Each table replacement is atomic, but the two replacements are not one transaction. Errors after a write may leave partially updated snapshots: check `SubscriptionTagInventory` and `ResourceTagInventory` before retrying. Both counts and timestamps are verified after writing. Empty subscriptions have a resource-inventory summary row with an empty resource ID, excluded from the detail table; this distinguishes a successful empty collection from a missing snapshot.
+
+To enable this page in an existing deployment, re-run the deployment utility with your usual parameters: it installs the supplemental KQL schema and updates the dashboard. This has not been automatically deployed by editing the repository. The subscription list is scoped to the collector identity's visible enabled subscriptions in the current tenant and to imported costs, **not** dynamically to each dashboard viewer's Azure subscription RBAC. Fabric workspace/database permissions govern who can see the inventory and cost data.
 
 ### When to run the script again
 
@@ -461,7 +508,7 @@ Every run writes a transcript (`logs/Deploy-FinOpsHub-V3-Fabric-<timestamp>.log`
 
 ### Update to a newer FinOps toolkit release
 
-`template.json`, `fabric/*.kql` and `finops-hub-dashboard.json` must come from the same FinOps toolkit release. To move to a newer release, replace all of them with the matching files from the [FinOps toolkit releases](https://github.com/microsoft/finops-toolkit/releases), test in a non-production resource group, and then run the script again.
+`template.json`, the two `fabric/finops-hub-fabric-setup-*.kql` scripts and the upstream dashboard must come from the same FinOps toolkit release. To move to a newer release, update those release assets from the [FinOps toolkit releases](https://github.com/microsoft/finops-toolkit/releases), preserve `fabric/finops-hub-subscription-tags.kql` and reapply this repository's tag-page extensions to the dashboard, test in a non-production resource group, and then run the script again.
 
 ## Security and networking
 
@@ -546,6 +593,7 @@ Run `Get-Help ./Deploy-FinOpsHub-V3-Fabric.ps1 -Full` for the complete help. Par
 | Parameter | Description | Default |
 |---|---|---|
 | `AllowDataFactoryPublicAccess` | Keep Data Factory public network access enabled | off |
+| `UsePublicNetworking` | Deploy with public network access: no virtual network, subnet, private endpoints, private DNS or Data Factory managed network (the VNet/subnet/DNS parameters are ignored and not required) | off |
 | `KeepStorageFirewallClosed` | Keep the hub storage firewall closed. Data then stays in storage and does not reach Fabric (see [Security and networking](#security-and-networking)). | off |
 
 **Run control and files**
@@ -593,15 +641,30 @@ Run `Get-Help ./Deploy-FinOpsHub-V3-Fabric.ps1 -Full` for the complete help. Par
 | Path | Purpose |
 |---|---|
 | `Deploy-FinOpsHub-V3-Fabric.ps1` | The deployment utility (version 3) |
+| `Update-SubscriptionTagInventory.ps1` | Refreshes subscription tags and current ARM resource inventory in Fabric without changing Azure resources, tags or cost exports |
 | `template.json` | FinOps hub ARM template (FinOps toolkit release 14) |
 | `parametersFile.json` | Template parameter values. `null` means the template default; script parameters override the file. |
 | `finops-hub-dashboard.json` | FinOps hub dashboard definition, imported into Fabric |
 | `fabric/finops-hub-fabric-setup-Ingestion.kql`, `fabric/finops-hub-fabric-setup-Hub.kql` | Database setup scripts (FinOps toolkit release 14 assets that match `template.json`) |
+| `fabric/finops-hub-subscription-tags.kql` | Supplemental subscription inventory table and tag cost functions |
+| `tests/` | Offline PowerShell snapshot tests and typed Kusto query validation |
 | `modules/private-endpoints.bicep`, `modules/private-dns-zones.bicep` | Bicep source of the private endpoint and private DNS templates |
 | `modules/private-endpoints.json`, `modules/private-dns-zones.json` | The compiled ARM templates that the script deploys |
 | `examples/customer-fabric.psd1` | Sample parameters for unattended runs |
 | `docs/images/` | Pictures used in this README |
 | `logs/` | Created at run time: transcripts and JSON summaries (excluded from git) |
+
+## Local validation
+
+These checks do not sign in, deploy resources or write to Azure/Fabric. PowerShell tests require Pester 5; KQL analysis requires the .NET 8 SDK or later and restores the pinned Kusto language package.
+
+```powershell
+Invoke-Pester ./tests/SubscriptionTags.Tests.ps1
+python -m unittest discover -s tests -p 'test_*.py'
+dotnet run --project ./tests/KqlValidation/KqlValidation.csproj -- (Get-Location).Path
+```
+
+The KQL check analyzes all four functions, ten dashboard queries, and the resource-attribution assertions against typed fixtures; it does not execute queries. An optional second argument writes a self-contained synthetic query containing `tests/resource_cost_assertions.kql` for read-only execution in a Kusto engine. Its `Passed` results verify multi-tag matching, exact pairs, current/no-cost resources, missing resource IDs, historical resources, case-normalized IDs, currency separation and cost reconciliation. Verify the imported page with your actual Fabric data before relying on it for reporting.
 
 ## Credits, support and license
 

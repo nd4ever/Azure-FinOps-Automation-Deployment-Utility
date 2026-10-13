@@ -1,0 +1,171 @@
+.execute database script with (ContinueOnErrors=true)
+<|
+.create-merge table SubscriptionTagInventory (
+    SubscriptionId: string,
+    SubscriptionName: string,
+    Tags: dynamic,
+    SnapshotAt: datetime
+)
+//
+.create-merge table ResourceTagInventory (
+    SubscriptionId: string,
+    SubscriptionName: string,
+    ResourceId: string,
+    ResourceName: string,
+    ResourceGroup: string,
+    ResourceType: string,
+    Location: string,
+    Tags: dynamic,
+    SnapshotAt: datetime
+)
+//
+.create-or-alter function
+with (docstring = 'Azure cost records for a half-open charge date range and billing currency.', folder = 'Subscriptions')
+SubscriptionCosts(startDate: datetime, endDate: datetime, currency: string)
+{
+    Costs()
+    | where ChargePeriodStart >= startDate and ChargePeriodStart < endDate
+    | where isempty(currency) or BillingCurrency == currency
+    | extend SubscriptionId = tolower(tostring(split(SubAccountId, '/')[-1]))
+    | where isnotempty(SubscriptionId)
+    | project SubscriptionId, SubscriptionName = SubAccountName, BillingCurrency,
+        ResourceId = tolower(tostring(ResourceId)), ResourceName,
+        ResourceGroup = tostring(column_ifexists("x_ResourceGroupName", "")), ResourceType,
+        BilledCost, EffectiveCost, Tags
+}
+//
+.create-or-alter function
+with (docstring = 'Resource period totals plus current ARM resources without exported costs; resource IDs and currencies remain separate.', folder = 'Subscriptions')
+ResourceCosts(startDate: datetime, endDate: datetime, currency: string)
+{
+    let inventory = ResourceTagInventory
+        | where isnotempty(ResourceId)
+        | summarize arg_max(SnapshotAt, *) by SubscriptionId, ResourceId
+        | project SubscriptionId, ResourceId,
+            InventorySubscriptionName = SubscriptionName, InventoryResourceName = ResourceName,
+            InventoryResourceGroup = ResourceGroup, InventoryResourceType = ResourceType,
+            Location, CurrentResourceTags = Tags, ResourceInventoryAsOf = SnapshotAt,
+            InCurrentInventory = true;
+    SubscriptionCosts(startDate, endDate, currency)
+    | summarize SubscriptionName = take_any(SubscriptionName), ResourceName = take_any(ResourceName),
+        ResourceGroup = take_any(ResourceGroup), ResourceType = take_any(ResourceType),
+        ResourceBilledCost = sum(BilledCost), ResourceEffectiveCost = sum(EffectiveCost),
+        ResourceCostRecordCount = count() by SubscriptionId, ResourceId, BillingCurrency
+    | join kind=fullouter inventory on SubscriptionId, ResourceId
+    | project SubscriptionId = coalesce(SubscriptionId, SubscriptionId1),
+        SubscriptionName = coalesce(InventorySubscriptionName, SubscriptionName),
+        ResourceId = coalesce(ResourceId, ResourceId1),
+        ResourceName = coalesce(InventoryResourceName, ResourceName),
+        ResourceGroup = coalesce(InventoryResourceGroup, ResourceGroup),
+        ResourceType = coalesce(InventoryResourceType, ResourceType), Location,
+        BillingCurrency = coalesce(BillingCurrency, currency),
+        ResourceBilledCost = coalesce(ResourceBilledCost, 0.0),
+        ResourceEffectiveCost = coalesce(ResourceEffectiveCost, 0.0),
+        ResourceCostRecordCount = coalesce(ResourceCostRecordCount, long(0)),
+        CurrentResourceTags, ResourceInventoryAsOf,
+        InCurrentInventory = coalesce(InCurrentInventory, false)
+    | extend ResourceName = coalesce(ResourceName,
+        iff(isempty(ResourceId), "(Charges without resource ID)", tostring(split(ResourceId, "/")[-1])))
+    | extend ResourceStatus = case(InCurrentInventory, "Current ARM resource",
+        isempty(ResourceId), "Charges without resource ID",
+        "Not in current inventory (deleted, inaccessible, or stale snapshot)"),
+        CostStatus = iff(ResourceCostRecordCount == 0,
+            "No cost records in selected period/currency", "Cost records available")
+}
+//
+.create-or-alter function
+with (docstring = 'Resource detail with matching exported cost tags or current subscription tags; includes current resources without cost records.', folder = 'Subscriptions')
+ResourceTagCosts(startDate: datetime, endDate: datetime, currency: string)
+{
+    let resources = materialize(ResourceCosts(startDate, endDate, currency));
+    let costTags = SubscriptionCosts(startDate, endDate, currency)
+        | extend TagKeys = bag_keys(Tags)
+        | extend HasTag = coalesce(array_length(TagKeys), 0) > 0
+        | extend TagKeys = iff(HasTag, TagKeys, dynamic([""]))
+        | mv-expand TagKey = TagKeys to typeof(string)
+        | extend TagName = iff(HasTag, TagKey, "(No tags)"),
+            TagValue = iff(HasTag, tostring(Tags[TagKey]), "")
+        | summarize TagBilledCost = sum(BilledCost), TagEffectiveCost = sum(EffectiveCost),
+            TagCostRecordCount = count()
+            by SubscriptionId, ResourceId, BillingCurrency, HasTag, TagName, TagValue
+        | extend TagBasis = "Exported cost tags";
+    let noCostTags = resources
+        | where ResourceCostRecordCount == 0
+        | extend TagKeys = bag_keys(CurrentResourceTags)
+        | extend HasTag = coalesce(array_length(TagKeys), 0) > 0
+        | extend TagKeys = iff(HasTag, TagKeys, dynamic([""]))
+        | mv-expand TagKey = TagKeys to typeof(string)
+        | project SubscriptionId, ResourceId, BillingCurrency, HasTag,
+            TagName = iff(HasTag, TagKey, "(No tags)"),
+            TagValue = iff(HasTag, tostring(CurrentResourceTags[TagKey]), ""),
+            TagBilledCost = 0.0, TagEffectiveCost = 0.0, TagCostRecordCount = long(0),
+            TagBasis = "Current resource tags (no cost records)";
+    let resourceTags = union costTags, noCostTags
+        | join kind=inner resources on SubscriptionId, ResourceId, BillingCurrency
+        | extend TagSource = "Resource/cost";
+    let subscriptionTags = resources
+        | join kind=inner (
+            SubscriptionTagInventory
+            | summarize arg_max(SnapshotAt, *) by SubscriptionId
+            | project SubscriptionId, SubscriptionTags = Tags, SubscriptionTagsAsOf = SnapshotAt
+        ) on SubscriptionId
+        | extend TagKeys = bag_keys(SubscriptionTags)
+        | extend HasTag = coalesce(array_length(TagKeys), 0) > 0
+        | extend TagKeys = iff(HasTag, TagKeys, dynamic([""]))
+        | mv-expand TagKey = TagKeys to typeof(string)
+        | extend TagName = iff(HasTag, TagKey, "(No tags)"),
+            TagValue = iff(HasTag, tostring(SubscriptionTags[TagKey]), ""),
+            TagSource = "Subscription",
+            TagBasis = "Current subscription tags (not resource inheritance)",
+            TagBilledCost = ResourceBilledCost, TagEffectiveCost = ResourceEffectiveCost,
+            TagCostRecordCount = ResourceCostRecordCount;
+    union resourceTags, subscriptionTags
+    | project SubscriptionId, SubscriptionName, ResourceId, ResourceName, ResourceGroup,
+        ResourceType, Location, InCurrentInventory, ResourceStatus, CurrentResourceTags,
+        ResourceInventoryAsOf, SubscriptionTagsAsOf, BillingCurrency,
+        ResourceBilledCost, ResourceEffectiveCost, ResourceCostRecordCount,
+        TagSource, HasTag, TagName, TagValue, TagBasis,
+        TagBilledCost, TagEffectiveCost, TagCostRecordCount, CostStatus
+}
+//
+.create-or-alter function
+with (docstring = 'Separate resource/cost and current subscription tag attribution; rows overlap and must not be added together.', folder = 'Subscriptions')
+SubscriptionTagCosts(startDate: datetime, endDate: datetime, currency: string)
+{
+    let costs = materialize(SubscriptionCosts(startDate, endDate, currency));
+    let inventory = SubscriptionTagInventory
+        | summarize arg_max(SnapshotAt, *) by SubscriptionId
+        | project SubscriptionId, InventoryName = SubscriptionName,
+            SubscriptionTags = Tags, SnapshotAt;
+    let resourceTags = ResourceTagCosts(startDate, endDate, currency)
+        | where TagSource == "Resource/cost"
+        | summarize BilledCost = sum(TagBilledCost), EffectiveCost = sum(TagEffectiveCost),
+            CostRecordCount = sum(TagCostRecordCount)
+            by SubscriptionId, SubscriptionName, BillingCurrency, HasTag, TagName, TagValue
+        | extend TagSource = "Resource/cost", SnapshotAt = datetime(null),
+            CostStatus = iff(CostRecordCount == 0,
+                "No cost records in selected period/currency", "Cost records available");
+    let subscriptionTags = inventory
+        | join kind=leftouter (
+            costs
+            | summarize BilledCost = sum(BilledCost), EffectiveCost = sum(EffectiveCost),
+                CostRecordCount = count() by SubscriptionId, BillingCurrency
+        ) on SubscriptionId
+        | extend SubscriptionName = InventoryName,
+            BillingCurrency = coalesce(BillingCurrency, currency),
+            BilledCost = coalesce(BilledCost, 0.0),
+            EffectiveCost = coalesce(EffectiveCost, 0.0),
+            CostRecordCount = coalesce(CostRecordCount, long(0))
+        | extend CostStatus = iff(CostRecordCount == 0,
+            "No cost records in selected period/currency", "Cost records available")
+        | extend TagKeys = bag_keys(SubscriptionTags)
+        | extend HasTag = coalesce(array_length(TagKeys), 0) > 0
+        | extend TagKeys = iff(HasTag, TagKeys, dynamic([""]))
+        | mv-expand TagKey = TagKeys to typeof(string)
+        | extend TagName = iff(HasTag, TagKey, "(No tags)"),
+            TagValue = iff(HasTag, tostring(SubscriptionTags[TagKey]), ""),
+            TagSource = "Subscription";
+    union resourceTags, subscriptionTags
+    | project SubscriptionId, SubscriptionName, TagSource, HasTag, TagName, TagValue,
+        BillingCurrency, BilledCost, EffectiveCost, CostRecordCount, CostStatus, SnapshotAt
+}

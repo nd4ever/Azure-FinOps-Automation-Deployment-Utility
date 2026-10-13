@@ -6,6 +6,52 @@
   "schema_version": "60",
   "tiles": [
     {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a11",
+      "title": "",
+      "visualType": "markdownCard",
+      "pageId": "a6c90100-487a-4e37-9b5a-21bbc3b67a01",
+      "layout": { "x": 0, "y": 0, "width": 22, "height": 4 },
+      "markdownText": "# Subscription costs by tag\nSelect several **Tag names (multi-select)** in the TOP filter bar, not the table column funnel. Clear any column funnel when changing tags. Right-click a **SubscriptionId** cell and choose **Cross-filter** to narrow this page; **Reset** or the top **Subscriptions** selector restores your selection. Resource detail is below the subscription tables, not inside the row-expansion arrow. The **Tag cost period** controls this page; trend/group controls do not apply here.\n\n**Tag rows overlap: never add their costs together.** Resource/cost rows use exported tags, or current ARM tags when no cost records exist. Subscription rows repeat full costs for each current subscription tag; they do not represent historical tag inheritance. The resource table distinguishes matching-tag cost from full-resource cost and shows current tags separately. Use subscription totals for non-duplicated totals by currency. No cost records is not evidence of no Azure spend.",
+      "visualOptions": {}
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a12",
+      "title": "Matching subscriptions - full period costs (not summed tag rows)",
+      "visualType": "table",
+      "pageId": "a6c90100-487a-4e37-9b5a-21bbc3b67a01",
+      "layout": { "x": 0, "y": 4, "width": 22, "height": 8 },
+      "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a28" },
+      "visualOptions": { "colorRulesDisabled": true, "crossFilterDisabled": false, "drillthroughDisabled": true, "crossFilter": [{ "interaction": "column", "property": "SubscriptionId", "parameterId": "a6c90100-487a-4e37-9b5a-21bbc3b67a43" }] }
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a13",
+      "title": "Cost by subscription, tag source, name and value",
+      "visualType": "table",
+      "pageId": "a6c90100-487a-4e37-9b5a-21bbc3b67a01",
+      "layout": { "x": 0, "y": 12, "width": 22, "height": 14 },
+      "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a27" },
+      "visualOptions": { "colorRulesDisabled": true, "crossFilterDisabled": false, "drillthroughDisabled": true, "crossFilter": [{ "interaction": "column", "property": "SubscriptionId", "parameterId": "a6c90100-487a-4e37-9b5a-21bbc3b67a43" }] }
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a14",
+      "title": "Tag and resource inventory snapshots - refresh separately from daily cost exports",
+      "visualType": "table",
+      "pageId": "a6c90100-487a-4e37-9b5a-21bbc3b67a01",
+      "layout": { "x": 0, "y": 42, "width": 22, "height": 4 },
+      "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a29" },
+      "visualOptions": { "colorRulesDisabled": true, "crossFilterDisabled": true, "drillthroughDisabled": true }
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a15",
+      "title": "Resource detail - current ARM inventory and exported costs (tag rows overlap)",
+      "description": "Use the top multi-select filters or cross-filter a subscription ID above. Current resources without exports are retained; charges for missing resource IDs or resources absent from inventory remain visible.",
+      "visualType": "table",
+      "pageId": "a6c90100-487a-4e37-9b5a-21bbc3b67a01",
+      "layout": { "x": 0, "y": 26, "width": 22, "height": 16 },
+      "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a50" },
+      "visualOptions": { "colorRulesDisabled": true, "crossFilterDisabled": true, "drillthroughDisabled": true }
+    },
+    {
       "id": "acf2ca3d-9d8f-477f-b259-f3937bf938d4",
       "title": "Cost last month",
       "visualType": "multistat",
@@ -2740,6 +2786,9 @@
     }
   ],
   "baseQueries": [
+    { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a31", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a21", "variableName": "TagPeriodCosts" },
+    { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a32", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a22", "variableName": "TagCostRows" },
+    { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a33", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a23", "variableName": "FilteredTagCostRows" },
     { "id": "58764bcb-2ba0-4c7f-b018-e5d7f6cff688", "queryId": "43612ae4-c475-4f22-bb50-ce9d995abb8f", "variableName": "CostsThisMonth" },
     { "id": "21512220-154c-4646-a188-72e8c437d8ed", "queryId": "cb1f5404-c0b1-42fd-99fb-3cff7b08daaa", "variableName": "CostsLastMonth" },
     { "id": "5fa73857-4e92-4a16-8179-f94563e5f605", "queryId": "4ce0f587-2d45-436c-8f79-102c6b382439", "variableName": "CostsByMonth" },
@@ -2748,6 +2797,74 @@
     { "id": "48ebd897-d085-490f-8b4b-9b43d4fb2efc", "queryId": "eb9259cc-05b7-4441-a66d-a29026fe371b", "variableName": "CostsPlus" }
   ],
   "parameters": [
+    {
+      "kind": "duration",
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a41",
+      "displayName": "Tag cost period",
+      "description": "Charge-period start dates from the start (inclusive) to the end (exclusive). Defaults to the last 30 days.",
+      "beginVariableName": "tagCostStart",
+      "endVariableName": "tagCostEnd",
+      "defaultValue": { "kind": "dynamic", "count": 30, "unit": "days" },
+      "showOnPages": { "kind": "selection", "pageIds": ["a6c90100-487a-4e37-9b5a-21bbc3b67a01"] }
+    },
+    {
+      "kind": "string",
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a42",
+      "displayName": "Tag source",
+      "description": "Resource/cost tags from exports, current subscription-level tags from the inventory snapshot, or both shown separately.",
+      "variableName": "selectedTagSource",
+      "selectionType": "scalar",
+      "includeAllOption": false,
+      "defaultValue": { "kind": "value", "value": "Both" },
+      "dataSource": {
+        "kind": "static",
+        "values": [
+          { "displayText": "Both", "value": "Both" },
+          { "displayText": "Resource/cost tags", "value": "Resource/cost" },
+          { "displayText": "Subscription tags", "value": "Subscription" }
+        ]
+      },
+      "showOnPages": { "kind": "selection", "pageIds": ["a6c90100-487a-4e37-9b5a-21bbc3b67a01"] }
+    },
+    {
+      "kind": "string",
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a43",
+      "displayName": "Subscriptions",
+      "description": "Select one or more subscriptions by name and unique subscription ID. All includes inventory and cost-data subscriptions.",
+      "variableName": "selectedTagSubscriptions",
+      "selectionType": "array",
+      "includeAllOption": true,
+      "allIsNull": true,
+      "defaultValue": { "kind": "all" },
+      "dataSource": { "kind": "query", "autoReset": true, "columns": { "value": "Value", "label": "Label" }, "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a24" } },
+      "showOnPages": { "kind": "selection", "pageIds": ["a6c90100-487a-4e37-9b5a-21bbc3b67a01"] }
+    },
+    {
+      "kind": "string",
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a44",
+      "displayName": "Tag names (multi-select)",
+      "description": "Use this top-bar selector to check multiple names; table column funnels are independent local filters. (No tags) is distinct from a real tag with that name. Choices follow the source and subscription filters.",
+      "variableName": "selectedTagNames",
+      "selectionType": "array",
+      "includeAllOption": true,
+      "allIsNull": true,
+      "defaultValue": { "kind": "all" },
+      "dataSource": { "kind": "query", "autoReset": true, "columns": { "value": "Value", "label": "Label" }, "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a25" } },
+      "showOnPages": { "kind": "selection", "pageIds": ["a6c90100-487a-4e37-9b5a-21bbc3b67a01"] }
+    },
+    {
+      "kind": "string",
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a45",
+      "displayName": "Tag values (name = value)",
+      "description": "Select exact source/name/value pairs independently. Identical values on different names or sources are not cross-matched.",
+      "variableName": "selectedTagPairs",
+      "selectionType": "array",
+      "includeAllOption": true,
+      "allIsNull": true,
+      "defaultValue": { "kind": "all" },
+      "dataSource": { "kind": "query", "autoReset": true, "columns": { "value": "Value", "label": "Label" }, "queryRef": { "kind": "query", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a26" } },
+      "showOnPages": { "kind": "selection", "pageIds": ["a6c90100-487a-4e37-9b5a-21bbc3b67a01"] }
+    },
     {
       "kind": "int",
       "id": "50e8acdc-5d90-4937-96cb-53a9b0ad047f",
@@ -2800,6 +2917,7 @@
     { "name": "About", "id": "969ddf4c-8f2a-4ec4-9588-bb2f39473c9f" },
     { "name": "UNDERSTAND", "id": "ea47329e-0bc9-4c11-b110-534878dbb3ad" },
     { "id": "f8ee3008-df7e-442f-825e-2e3b46e4c185", "name": "- Summary" },
+    { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a01", "name": "- Subscription costs by tag" },
     { "name": "- Anomaly management", "id": "5838c918-4541-44fe-90d2-77306ef1e241" },
     { "name": "- Data ingestion", "id": "9e099251-9658-48da-b416-80422a2a47c7" },
     { "name": "OPTIMIZE", "id": "d01a8154-8a60-4d22-96ea-54b45b1417fe" },
@@ -2811,6 +2929,66 @@
     { "name": "- Invoicing + chargeback", "id": "f416685d-f559-4514-8e45-5e0e09aec286" }
   ],
   "queries": [
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a21",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "SubscriptionCosts(tagCostStart, tagCostEnd, selectedBillingCurrency)",
+      "usedVariables": ["tagCostStart", "tagCostEnd", "selectedBillingCurrency"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a22",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "SubscriptionTagCosts(tagCostStart, tagCostEnd, selectedBillingCurrency)\n| extend TagNameKey = tostring(pack_array(HasTag, TagName)), TagPairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))",
+      "usedVariables": ["tagCostStart", "tagCostEnd", "selectedBillingCurrency"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a23",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "TagCostRows\n| where selectedTagSource == 'Both' or TagSource == selectedTagSource\n| where isnull(selectedTagSubscriptions) or SubscriptionId in (selectedTagSubscriptions)\n| where isnull(selectedTagNames) or TagNameKey in (selectedTagNames)\n| where isnull(selectedTagPairs) or TagPairKey in (selectedTagPairs)",
+      "usedVariables": ["TagCostRows", "selectedTagSource", "selectedTagSubscriptions", "selectedTagNames", "selectedTagPairs"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a24",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "SubscriptionTagInventory\n| project Value = SubscriptionId, SubscriptionName\n| union (TagPeriodCosts | project Value = SubscriptionId, SubscriptionName)\n| summarize SubscriptionName = take_any(SubscriptionName) by Value\n| extend Label = strcat(SubscriptionName, ' (', Value, ')')\n| project Value, Label\n| order by Label asc",
+      "usedVariables": ["TagPeriodCosts"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a25",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "TagCostRows\n| where selectedTagSource == 'Both' or TagSource == selectedTagSource\n| where isnull(selectedTagSubscriptions) or SubscriptionId in (selectedTagSubscriptions)\n| project Value = TagNameKey, Label = iff(HasTag, TagName, '(No tags) - untagged')\n| distinct Value, Label\n| order by Label asc",
+      "usedVariables": ["TagCostRows", "selectedTagSource", "selectedTagSubscriptions"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a26",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "TagCostRows\n| where selectedTagSource == 'Both' or TagSource == selectedTagSource\n| where isnull(selectedTagSubscriptions) or SubscriptionId in (selectedTagSubscriptions)\n| where isnull(selectedTagNames) or TagNameKey in (selectedTagNames)\n| project Value = TagPairKey, Label = strcat(iff(HasTag, strcat(TagName, ' = ', TagValue), '(No tags) - untagged'), ' [', TagSource, ']')\n| distinct Value, Label\n| order by Label asc",
+      "usedVariables": ["TagCostRows", "selectedTagSource", "selectedTagSubscriptions", "selectedTagNames"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a27",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "FilteredTagCostRows\n| project SubscriptionName, SubscriptionId, TagSource, TagName, TagValue, HasTag, BillingCurrency, BilledCost = round(BilledCost, 2), EffectiveCost = round(EffectiveCost, 2), CostRecordCount, CostStatus, SubscriptionTagsAsOf = SnapshotAt\n| order by SubscriptionName asc, SubscriptionId asc, TagSource asc, TagName asc, TagValue asc, BillingCurrency asc",
+      "usedVariables": ["FilteredTagCostRows"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a28",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "let matchingSubscriptions = FilteredTagCostRows | summarize SubscriptionName = take_any(SubscriptionName) by SubscriptionId;\nmatchingSubscriptions\n| join kind=leftouter (\n    TagPeriodCosts\n    | summarize BilledCost = sum(BilledCost), EffectiveCost = sum(EffectiveCost), CostRecordCount = count() by SubscriptionId, BillingCurrency\n) on SubscriptionId\n| extend BillingCurrency = coalesce(BillingCurrency, selectedBillingCurrency), CostRecordCount = coalesce(CostRecordCount, long(0))\n| project SubscriptionName, SubscriptionId, BillingCurrency, BilledCost = round(coalesce(BilledCost, 0.0), 2), EffectiveCost = round(coalesce(EffectiveCost, 0.0), 2), CostRecordCount, CostStatus = iff(CostRecordCount == 0, 'No cost records in selected period/currency', 'Cost records available')\n| order by SubscriptionName asc, SubscriptionId asc, BillingCurrency asc",
+      "usedVariables": ["FilteredTagCostRows", "TagPeriodCosts", "selectedBillingCurrency"]
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a29",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "let subscriptions = SubscriptionTagInventory\n| summarize Subscriptions = dcount(SubscriptionId), SnapshotAt = min(SnapshotAt)\n| extend Inventory = 'Subscription tags';\nlet resources = ResourceTagInventory\n| summarize Subscriptions = dcount(SubscriptionId), Resources = countif(isnotempty(ResourceId)), SnapshotAt = min(SnapshotAt)\n| extend Inventory = 'ARM resource inventory';\nunion subscriptions, resources\n| extend SnapshotAge = now() - SnapshotAt\n| extend Status = case(Subscriptions == 0, 'Not synchronized - run Update-SubscriptionTagInventory.ps1', SnapshotAge > 1d, 'Older than 24 hours - refresh tags and resources', 'Snapshot available (current inventory, not historical)')\n| project Inventory, Subscriptions, Resources, SnapshotAt, SnapshotAge, Status",
+      "usedVariables": []
+    },
+    {
+      "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a50",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "ResourceTagCosts(tagCostStart, tagCostEnd, selectedBillingCurrency)\n| extend TagNameKey = tostring(pack_array(HasTag, TagName)), TagPairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))\n| where selectedTagSource == 'Both' or TagSource == selectedTagSource\n| where isnull(selectedTagSubscriptions) or SubscriptionId in (selectedTagSubscriptions)\n| where isnull(selectedTagNames) or TagNameKey in (selectedTagNames)\n| where isnull(selectedTagPairs) or TagPairKey in (selectedTagPairs)\n| project SubscriptionName, ResourceName, ResourceGroup, ResourceType, TagSource, TagName, TagValue, TagBasis, BillingCurrency,\n    MatchingTagBilledCost = round(TagBilledCost, 2), MatchingTagEffectiveCost = round(TagEffectiveCost, 2),\n    FullResourceBilledCost = round(ResourceBilledCost, 2), FullResourceEffectiveCost = round(ResourceEffectiveCost, 2),\n    TagCostRecordCount, ResourceCostRecordCount, CostStatus, ResourceStatus, InCurrentInventory,\n    CurrentResourceTags, ResourceInventoryAsOf, SubscriptionTagsAsOf, Location, SubscriptionId, ResourceId\n| order by SubscriptionName asc, SubscriptionId asc, ResourceName asc, ResourceId asc, TagSource asc, TagName asc, TagValue asc, BillingCurrency asc",
+      "usedVariables": ["tagCostStart", "tagCostEnd", "selectedBillingCurrency", "selectedTagSource", "selectedTagSubscriptions", "selectedTagNames", "selectedTagPairs"]
+    },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
       "text": "let monthname = dynamic(['(ignore)', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']);\nlet costs = materialize(\n    CostsLastMonth\n    | summarize BilledCost = round(sum(BilledCost), 2), EffectiveCost = round(sum(EffectiveCost), 2) by BillingPeriodStart = startofmonth(BillingPeriodStart)\n    | extend json = todynamic(strcat('[{\"type\":\"Billed cost\", \"Cost\":', BilledCost, '}, {\"type\":\"Effective cost\", \"Cost\":', EffectiveCost, '}]'))\n    | mv-expand json\n    | project Type = strcat(json.type, ' (', monthname[monthofyear(BillingPeriodStart)], ' ', format_datetime(BillingPeriodStart, 'yyyy'), ')'), Cost = todouble(json.Cost)\n);\ncosts",
@@ -3330,4 +3508,3 @@
     }
   ]
 }
-
