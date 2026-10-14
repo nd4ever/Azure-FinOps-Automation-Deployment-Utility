@@ -60,7 +60,10 @@ class TagDashboardTests(unittest.TestCase):
         new_parameters = [item for item in self.dashboard["parameters"] if item["id"].startswith(PREFIX)]
         self.assertEqual(len(new_parameters), 5)
         for item in new_parameters:
-            self.assertEqual(item["showOnPages"], {"kind": "selection", "pageIds": [PAGE]})
+            if item["kind"] == "duration":
+                self.assertEqual(item["showOnPages"], {"kind": "all"})
+            else:
+                self.assertEqual(item["showOnPages"], {"kind": "selection", "pageIds": [PAGE]})
         for name in ("selectedTagSubscriptions", "selectedTagNames", "selectedTagPairs"):
             item = self.parameters[name]
             self.assertEqual(item["selectionType"], "array")

@@ -1,0 +1,48 @@
+let asOf = datetime(2026-10-14T12:00:00Z);
+let customStart = datetime(2026-10-01);
+let customEnd = datetime(2026-10-14);
+let mtd = ResolveChargePeriod('MonthToDate', customStart, customEnd, asOf);
+let lastMonth = ResolveChargePeriod('LastMonth', customStart, customEnd, asOf);
+let custom = ResolveChargePeriod('Custom', customStart, customEnd, asOf);
+let january = ResolveChargePeriod('LastMonth', customStart, customEnd, datetime(2026-01-01));
+let leapFebruary = ResolveChargePeriod('LastMonth', customStart, customEnd, datetime(2024-03-01));
+let selected = materialize(SelectPeriodCosts('Custom', customStart, customEnd, asOf));
+let current = materialize(SelectPeriodCosts('MonthToDate', customStart, customEnd, asOf));
+union
+    (print Check = 'Month to date starts at UTC month start and ends now',
+        Passed = toscalar(mtd | project StartDate) == datetime(2026-10-01)
+            and toscalar(mtd | project EndDate) == asOf),
+    (print Check = 'Last month is a full calendar month, not 30 days',
+        Passed = toscalar(lastMonth | project StartDate) == datetime(2026-09-01)
+            and toscalar(lastMonth | project EndDate) == datetime(2026-10-01)),
+    (print Check = 'Custom dates preserve the chosen calendar bounds',
+        Passed = toscalar(custom | project StartDate) == customStart
+            and toscalar(custom | project EndDate) == customEnd),
+    (print Check = 'January previous month crosses the year boundary',
+        Passed = toscalar(january | project StartDate) == datetime(2025-12-01)
+            and toscalar(january | project EndDate) == datetime(2026-01-01)),
+    (print Check = 'Leap-year February includes February 29',
+        Passed = toscalar(leapFebruary | project StartDate) == datetime(2024-02-01)
+            and toscalar(leapFebruary | project EndDate) == datetime(2024-03-01)),
+    (selected | summarize Records = count(), Total = sum(BilledCost), Effective = sum(EffectiveCost)
+        | project Check = 'Custom range includes start and last instant, excludes end and prior month',
+            Passed = Records == 2 and Total == 30.0 and Effective == 24.0),
+    (current | summarize Records = count(), Total = sum(BilledCost)
+        | project Check = 'Month to date includes today, not future or previous-month charges',
+            Passed = Records == 3 and Total == 60.0),
+    (FixedCurrentMonthCosts(asOf, 'USD')
+        | summarize Records = count(), Total = sum(BilledCost), Effective = sum(EffectiveCost)
+        | project Check = 'Fixed current-month costs include today and exclude previous/future charges',
+            Passed = Records == 3 and Total == 60.0 and Effective == 48.0),
+    (FixedCurrentMonthCosts(asOf, 'EUR')
+        | summarize Records = count()
+        | project Check = 'Fixed current-month cards respect the billing-currency filter', Passed = Records == 0),
+    (SelectPeriodCosts('Custom', datetime(2026-10-14), datetime(2026-10-14), asOf)
+        | summarize Records = count()
+        | project Check = 'An empty half-open interval contains no charges', Passed = Records == 0),
+    (selected | summarize PreviousBillingMonth = countif(BillingPeriodStart == datetime(2026-09-01))
+        | project Check = 'Charge dates filter independently of billing month', Passed = PreviousBillingMonth == 1),
+    (SelectPeriodCosts('TrendControls', customStart, customEnd, asOf)
+        | summarize Records = count()
+        | project Check = 'Trend controls mode leaves the shared costs for downstream legacy windows', Passed = Records == 6)
+| order by Check asc

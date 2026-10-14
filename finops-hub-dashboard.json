@@ -6,12 +6,142 @@
   "schema_version": "60",
   "tiles": [
     {
+      "id": "b72860dc-526e-4c14-9556-000000000014",
+      "title": "",
+      "visualType": "markdownCard",
+      "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
+      "layout": {
+        "x": 0,
+        "y": 2,
+        "width": 22,
+        "height": 2
+      },
+      "markdownText": "## Current month — month to date (UTC)\nFixed billed/effective costs and savings, independent of Charge period and trend controls. The last-month comparison remains below; other charts follow their own labeled periods.",
+      "visualOptions": {}
+    },
+    {
+      "description": "Fixed calendar-month view: current UTC month-to-date charge dates; independent of Charge period and trend controls. Currency still applies. Costs reflect imported exports.",
+      "id": "b72860dc-526e-4c14-9556-000000000013",
+      "title": "Current month costs and savings (month to date - fixed)",
+      "visualType": "multistat",
+      "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "width": 22,
+        "height": 8
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "b72860dc-526e-4c14-9556-000000000012"
+      },
+      "visualOptions": {
+        "multiStat__textSize": "auto",
+        "multiStat__valueColumn": null,
+        "colorRulesDisabled": true,
+        "colorStyle": "light",
+        "multiStat__displayOrientation": "horizontal",
+        "multiStat__labelColumn": null,
+        "multiStat__slot": {
+          "width": 4,
+          "height": 1
+        },
+        "colorRules": []
+      }
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000010",
+      "title": "",
+      "visualType": "markdownCard",
+      "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
+      "layout": { "x": 0, "y": 11, "width": 21, "height": 2 },
+      "markdownText": "## Current month — month to date (UTC)\nFixed current-month charge dates, independent of Charge period and trend controls. Costs reflect imported exports and may lag billing.",
+      "visualOptions": {}
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000008",
+      "title": "Cost current month (month to date - fixed)",
+      "description": "Fixed calendar-month view: current UTC month-to-date charge dates; independent of Charge period and trend controls. Currency still applies. Costs reflect imported exports.",
+      "visualType": "multistat",
+      "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
+      "layout": { "x": 0, "y": 13, "width": 9, "height": 8 },
+      "queryRef": { "kind": "query", "queryId": "b72860dc-526e-4c14-9556-000000000006" },
+      "visualOptions": {
+        "multiStat__textSize": "large",
+        "multiStat__valueColumn": null,
+        "colorRulesDisabled": true,
+        "colorStyle": "light",
+        "multiStat__displayOrientation": "horizontal",
+        "multiStat__labelColumn": null,
+        "multiStat__slot": { "width": 1, "height": 2 },
+        "colorRules": []
+      }
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000009",
+      "title": "Counts (current month - fixed)",
+      "description": "Fixed calendar-month view: distinct subscriptions, resource groups, resources and services in current UTC month-to-date charge records. Independent of Charge period and trend controls; Currency still applies.",
+      "visualType": "multistat",
+      "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
+      "layout": { "x": 9, "y": 13, "width": 12, "height": 8 },
+      "queryRef": { "kind": "query", "queryId": "b72860dc-526e-4c14-9556-000000000007" },
+      "visualOptions": {
+        "multiStat__textSize": "auto",
+        "multiStat__valueColumn": null,
+        "colorRulesDisabled": false,
+        "colorStyle": "light",
+        "multiStat__displayOrientation": "horizontal",
+        "multiStat__labelColumn": null,
+        "multiStat__slot": { "width": 4, "height": 1 },
+        "colorRules": []
+      }
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000011",
+      "title": "",
+      "visualType": "markdownCard",
+      "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
+      "layout": { "x": 0, "y": 21, "width": 21, "height": 2 },
+      "markdownText": "## Last month — fixed comparison\nExisting previous billing-month cost and count cards are preserved below. These do not follow Charge period.",
+      "visualOptions": {}
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000005",
+      "title": "Selected-period cost",
+      "visualType": "multistat",
+      "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
+      "layout": {
+        "x": 0,
+        "y": 3,
+        "width": 4,
+        "height": 8
+      },
+      "queryRef": {
+        "kind": "query",
+        "queryId": "b72860dc-526e-4c14-9556-000000000004"
+      },
+      "visualOptions": {
+        "multiStat__textSize": "large",
+        "multiStat__valueColumn": null,
+        "colorRulesDisabled": true,
+        "colorStyle": "light",
+        "multiStat__displayOrientation": "horizontal",
+        "multiStat__labelColumn": null,
+        "multiStat__slot": {
+          "width": 1,
+          "height": 2
+        },
+        "colorRules": []
+      },
+      "description": "Follows Charge period; defaults to month to date. Monthly/Daily trend controls apply only in Trend controls mode. Costs reflect imported exports, not a live billing estimate. Dates are UTC and the end is exclusive."
+    },
+    {
       "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a11",
       "title": "",
       "visualType": "markdownCard",
       "pageId": "a6c90100-487a-4e37-9b5a-21bbc3b67a01",
       "layout": { "x": 0, "y": 0, "width": 22, "height": 4 },
-      "markdownText": "# Subscription costs by tag\nSelect several **Tag names (multi-select)** in the TOP filter bar, not the table column funnel. Clear any column funnel when changing tags. Right-click a **SubscriptionId** cell and choose **Cross-filter** to narrow this page; **Reset** or the top **Subscriptions** selector restores your selection. Resource detail is below the subscription tables, not inside the row-expansion arrow. The **Tag cost period** controls this page; trend/group controls do not apply here.\n\n**Tag rows overlap: never add their costs together.** Resource/cost rows use exported tags, or current ARM tags when no cost records exist. Subscription rows repeat full costs for each current subscription tag; they do not represent historical tag inheritance. The resource table distinguishes matching-tag cost from full-resource cost and shows current tags separately. Use subscription totals for non-duplicated totals by currency. No cost records is not evidence of no Azure spend.",
+      "markdownText": "# Subscription costs by tag\nSelect several **Tag names (multi-select)** in the TOP filter bar, not the table column funnel. Clear any column funnel when changing tags. Right-click a **SubscriptionId** cell and choose **Cross-filter** to narrow this page; **Reset** or the top **Subscriptions** selector restores your selection. Resource detail is below the subscription tables, not inside the row-expansion arrow. The global **Charge period** controls this page. Choose **Custom date range** to use **Custom charge dates**; trend/group controls do not apply here.\n\n**Tag rows overlap: never add their costs together.** Resource/cost rows use exported tags, or current ARM tags when no cost records exist. Subscription rows repeat full costs for each current subscription tag; they do not represent historical tag inheritance. The resource table distinguishes matching-tag cost from full-resource cost and shows current tags separately. Use subscription totals for non-duplicated totals by currency. No cost records is not evidence of no Azure spend.",
       "visualOptions": {}
     },
     {
@@ -52,11 +182,12 @@
       "visualOptions": { "colorRulesDisabled": true, "crossFilterDisabled": true, "drillthroughDisabled": true }
     },
     {
+      "description": "Fixed calendar-month view; independent of Charge period.",
       "id": "acf2ca3d-9d8f-477f-b259-f3937bf938d4",
-      "title": "Cost last month",
+      "title": "Cost last month (fixed comparison)",
       "visualType": "multistat",
       "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
-      "layout": { "x": 0, "y": 3, "width": 4, "height": 8 },
+      "layout": { "x": 0, "y": 23, "width": 9, "height": 8 },
       "queryRef": { "kind": "query", "queryId": "152f2041-bbc1-41e4-b155-271b2e0cf6e9" },
       "visualOptions": {
         "multiStat__textSize": "large",
@@ -70,6 +201,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "595e39e5-02ff-4ee7-99f9-68694ffd0495",
       "title": "Cost over time",
       "visualType": "column",
@@ -99,6 +231,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "efd2b03d-c80d-4d78-b77a-efa3f932efdb",
       "title": "Change over time",
       "visualType": "column",
@@ -128,11 +261,12 @@
       }
     },
     {
+      "description": "Fixed calendar-month view; independent of Charge period.",
       "id": "9c5e208a-f0ce-4e2e-9969-35130eef22c1",
-      "title": "Counts",
+      "title": "Counts (last month - fixed)",
       "visualType": "multistat",
       "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
-      "layout": { "x": 0, "y": 11, "width": 12, "height": 4 },
+      "layout": { "x": 9, "y": 23, "width": 12, "height": 8 },
       "queryRef": { "kind": "query", "queryId": "f2cecbb0-13f8-4642-afa4-bbcc0558f777" },
       "visualOptions": {
         "multiStat__textSize": "auto",
@@ -146,11 +280,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "2a1ee947-f1e3-447e-9388-91e318068608",
-      "title": "Counts (last n days)",
+      "title": "Counts (selected period)",
       "visualType": "multistat",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 15, "width": 6, "height": 8 },
+      "layout": {"x": 0, "y": 25, "width": 6, "height": 8},
       "queryRef": { "kind": "query", "queryId": "5d63e04d-1a11-4307-96f1-ebbf68e09be0" },
       "visualOptions": {
         "multiStat__textSize": "auto",
@@ -180,11 +315,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "49534f2e-97ea-4b41-87c2-5e0f4bc26db8",
       "title": "Effective cost",
       "visualType": "column",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 6, "y": 2, "width": 16, "height": 9 },
+      "layout": {"x": 6, "y": 12, "width": 16, "height": 9},
       "queryRef": { "kind": "query", "queryId": "290e7eab-8159-4338-8531-85e2718cedb1" },
       "visualOptions": {
         "multipleYAxes": {
@@ -357,7 +493,7 @@
       "title": "Cost + savings running total (this month and last)",
       "visualType": "stackedarea",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 6, "y": 11, "width": 16, "height": 7 },
+      "layout": {"x": 6, "y": 21, "width": 16, "height": 7},
       "queryRef": { "kind": "query", "queryId": "dcc1f533-e5f9-4855-9e4c-21e21fcdf943" },
       "visualOptions": {
         "multipleYAxes": {
@@ -382,11 +518,12 @@
       }
     },
     {
+      "description": "Fixed calendar-month view: previous UTC charge month; independent of Charge period and trend windows. Selected-period charts beside this card still follow Charge period.",
       "id": "66dcd731-a141-47b2-b36a-53a138cb75f2",
-      "title": "Summary",
+      "title": "Last month costs and savings (fixed)",
       "visualType": "multistat",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 2, "width": 6, "height": 13 },
+      "layout": {"x": 0, "y": 12, "width": 6, "height": 13},
       "queryRef": { "kind": "query", "queryId": "e8b343dc-7430-4487-8d44-ef48ac454f2d" },
       "visualOptions": {
         "multiStat__textSize": "auto",
@@ -431,11 +568,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "04cb63d9-0a92-488f-b863-815466d6725c",
       "title": "Summary",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 23, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 33, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "c077a6d4-719f-42fe-b39b-36f77dc68976" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -450,6 +588,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "4faba5ce-4190-45f9-b41e-5d9c6a9c8098",
       "title": "Summary",
       "visualType": "table",
@@ -469,6 +608,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "890e0366-a9a5-4001-bc6e-f1b7f23fa8a7",
       "title": "Effective cost by subscription",
       "visualType": "table",
@@ -492,16 +632,17 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 58, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 68, "width": 22, "height": 4},
       "markdownText": "# Regions\r\nEffective cost breakdown by region\r\n\r\n⬆️ [Top](?tile=e3ac3bbc-a9ef-44dd-828f-226afbcfda33) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.Regions)",
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "d3e265ff-2c5a-4a03-a8b8-e0b4e10cf362",
       "title": "Monthly trend by region",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 62, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 72, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "d5224d06-c8e7-4dd9-afec-595b39712f5a" },
       "visualOptions": {
         "multipleYAxes": {
@@ -526,11 +667,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "c54de4ff-e793-49b7-b33d-db22fccd0290",
       "title": "Monthly trend by region",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 67, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 77, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "0dcf2c54-7f1d-45e9-a53b-d598a24493a4" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -545,11 +687,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "b2916ba0-cb54-433d-89a1-8905b8d8618a",
       "title": "Monthly trend by service name",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 45, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 55, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "30644718-defd-4c6c-9ffa-a9c2cd1f871f" },
       "visualOptions": {
         "multipleYAxes": {
@@ -574,11 +717,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "6208961b-6249-4fd4-a2d6-16b5e58b9baa",
       "title": "Monthly trend by service name",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 50, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 60, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "6259f773-593c-4953-898c-15aa5ff6e53a" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -597,16 +741,17 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 75, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 85, "width": 22, "height": 4},
       "markdownText": "# Subscriptions\r\nEffective cost breakdown by subscription (subaccount)\r\n\r\n⬆️ [Top](?tile=e3ac3bbc-a9ef-44dd-828f-226afbcfda33) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.Subscriptions)",
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "b28897e5-0606-4112-a13a-0cd814055ea7",
       "title": "Monthly trend by subscription",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 79, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 89, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "21a87abe-19e2-44ec-8298-ba872e66c162" },
       "visualOptions": {
         "multipleYAxes": {
@@ -631,11 +776,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "7b24b810-3cd3-4b7c-92cc-6b40f071b24d",
       "title": "Monthly trend by subscription",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 84, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 94, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "90502e9a-2d0d-4ae4-8d9d-cc21f9b72d5d" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -650,11 +796,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "f56a2d38-7d69-4dfd-8cc8-6b7a292758b1",
       "title": "Monthly trend by resource group",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 101, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 111, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "c2c65ec0-e57d-4834-8a6b-b5975afeb9a0" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -669,11 +816,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "d2672640-0e48-47e5-a253-de927a77a637",
       "title": "Monthly trend by resource group",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 96, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 106, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "61b26784-6a73-4e80-85b2-9c5cfbd2dd06" },
       "visualOptions": {
         "multipleYAxes": {
@@ -702,7 +850,7 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 92, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 102, "width": 22, "height": 4},
       "markdownText": "# Resource groups\r\nEffective cost breakdown by resource group\r\n\r\n⬆️ [Top](?tile=e3ac3bbc-a9ef-44dd-828f-226afbcfda33) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.ResourceGroups)",
       "visualOptions": {}
     },
@@ -711,16 +859,17 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 109, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 119, "width": 22, "height": 4},
       "markdownText": "# Resources\r\nEffective cost breakdown by resource\r\n\r\n⬆️ [Top](?tile=e3ac3bbc-a9ef-44dd-828f-226afbcfda33) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.Resources)",
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "d84a014f-0b68-490b-a522-fba66fee1e0f",
       "title": "Monthly trend by resource",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 113, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 123, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "3924981c-23e4-464d-a872-045df1752750" },
       "visualOptions": {
         "multipleYAxes": {
@@ -745,11 +894,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "586ebe0b-ff5c-4794-91a1-a8ec845cad3a",
       "title": "Monthly trend by resource",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 123, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 133, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "c7be613e-deb4-4779-ad75-4445e8d5e01f" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -764,11 +914,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "c03c1e57-5e66-4eb1-a20b-10c887eb2140",
       "title": "Daily trend by resource",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 118, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 128, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "49e24ee0-91de-4b1c-973f-036a3c060aca" },
       "visualOptions": {
         "multipleYAxes": {
@@ -797,16 +948,17 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 28, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 38, "width": 22, "height": 4},
       "markdownText": "# Services\r\nEffective cost breakdown by service category and service name\r\n\r\n⬆️ [Top](?tile=e3ac3bbc-a9ef-44dd-828f-226afbcfda33) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.Services)",
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "700f736d-56b1-4194-8282-891683f63134",
       "title": "Monthly trend by service category",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 32, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 42, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "4c7a7614-9b8c-415b-a4e1-d2d53c023d31" },
       "visualOptions": {
         "multipleYAxes": {
@@ -831,11 +983,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "97872267-01c6-44f9-ad0d-34940d4b58fa",
       "title": "Monthly trend by service category",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 37, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 47, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "1d273b55-d2ea-427c-8a5f-01f6c240e98a" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -854,16 +1007,17 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 131, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 141, "width": 22, "height": 4},
       "markdownText": "# Resource inventory\r\nSummary of resources and their costs\r\n\r\n⬆️ [Top](?tile=e3ac3bbc-a9ef-44dd-828f-226afbcfda33) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.ResourceInventory)",
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "e26eb29d-8021-406c-a84e-5568ddd234f4",
       "title": "Monthly trend by resource type",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 154, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 164, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "90e30901-a931-4a1d-b81e-0a1821032c3c" },
       "visualOptions": {
         "multipleYAxes": {
@@ -888,11 +1042,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "8d63f5d3-b1d8-4117-a358-bce7939a13ae",
-      "title": "Daily trend by resource type (last n days)",
+      "title": "Daily trend by resource type (selected period)",
       "visualType": "stackedcolumn",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 141, "width": 22, "height": 5 },
+      "layout": {"x": 0, "y": 151, "width": 22, "height": 5},
       "queryRef": { "kind": "query", "queryId": "ebe41e27-e9f9-478e-ab90-fd1f87906766" },
       "visualOptions": {
         "multipleYAxes": {
@@ -917,11 +1072,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "8caa438b-10a8-418c-ab3b-5c5aee53d3e6",
       "title": "Monthly trend by resource",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 159, "width": 22, "height": 8 },
+      "layout": {"x": 0, "y": 169, "width": 22, "height": 8},
       "queryRef": { "kind": "query", "queryId": "7f7b08a9-ae15-46f8-8b0f-767280375add" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -937,12 +1093,12 @@
     },
     {
       "id": "011c2b2c-a232-4459-acf4-8db4055f4f70",
-      "title": "Most cost (last n days)",
+      "title": "Most cost (selected period)",
       "visualType": "bar",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 17, "y": 146, "width": 5, "height": 8 },
+      "layout": {"x": 17, "y": 156, "width": 5, "height": 8},
       "queryRef": { "kind": "query", "queryId": "a35b4c05-8ecb-4c51-9aaf-980af3d7923e" },
-      "description": "Uses the Daily trend parameter for the lookback period",
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. Uses the Daily trend parameter for the lookback period",
       "visualOptions": {
         "multipleYAxes": {
           "base": { "id": "-1", "label": "", "columns": [], "yAxisMaximumValue": null, "yAxisMinimumValue": null, "yAxisScale": "linear", "horizontalLines": [] },
@@ -967,12 +1123,12 @@
     },
     {
       "id": "4495e71e-1005-4224-91f4-8103f06981da",
-      "title": "Most used (last n days)",
+      "title": "Most used (selected period)",
       "visualType": "bar",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 12, "y": 146, "width": 5, "height": 8 },
+      "layout": {"x": 12, "y": 156, "width": 5, "height": 8},
       "queryRef": { "kind": "query", "queryId": "9c5d3cf0-b6cb-45a2-acfd-b19df425bddf" },
-      "description": "Uses the Daily trend parameter for the lookback period",
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. Uses the Daily trend parameter for the lookback period",
       "visualOptions": {
         "multipleYAxes": {
           "base": { "id": "-1", "label": "", "columns": [], "yAxisMaximumValue": null, "yAxisMinimumValue": null, "yAxisScale": "linear", "horizontalLines": [] },
@@ -996,11 +1152,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "38ffb57b-4646-4944-a92b-6966a3a6a807",
-      "title": "Resource type summary (last n days)",
+      "title": "Resource type summary (selected period)",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 146, "width": 12, "height": 8 },
+      "layout": {"x": 0, "y": 156, "width": 12, "height": 8},
       "queryRef": { "kind": "query", "queryId": "2d7b6447-2769-40b8-958a-f252dab68b1e" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -1015,11 +1172,12 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "a83872cb-44ef-402a-8512-b9d5ba04744e",
-      "title": "Resource inventory summary (last n days)",
+      "title": "Resource inventory summary (selected period)",
       "visualType": "multistat",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 135, "width": 22, "height": 6 },
+      "layout": {"x": 0, "y": 145, "width": 22, "height": 6},
       "queryRef": { "kind": "query", "queryId": "f062533b-8c94-412f-bf83-0eb5cd06063d" },
       "hideTitle": true,
       "visualOptions": {
@@ -1106,6 +1264,7 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "00b9ea3a-3902-4234-806f-1a7bf87b3992",
       "title": "Daily trend",
       "visualType": "column",
@@ -1154,8 +1313,9 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "72aa5a62-e129-4ffa-be62-82c833282d27",
-      "title": "SKUs with negotiated discounts (last n days)",
+      "title": "SKUs with negotiated discounts (selected period)",
       "visualType": "table",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 118, "width": 14, "height": 6 },
@@ -1173,8 +1333,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "3d7688f7-0a1c-4564-b851-f380a22817bf",
-      "title": "SKUs with commitment discounts (last n days)",
+      "title": "SKUs with commitment discounts (selected period)",
       "visualType": "table",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 124, "width": 14, "height": 6 },
@@ -1192,8 +1353,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "b2c9dcef-b40d-4dad-a0a3-cb5fe2c77156",
-      "title": "SKUs with no discounts (last n days)",
+      "title": "SKUs with no discounts (selected period)",
       "visualType": "table",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 130, "width": 14, "height": 6 },
@@ -1211,8 +1373,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "a3d814b8-ff20-4919-ae2a-f1caec997edf",
-      "title": "Most used SKUs (last n days)",
+      "title": "Most used SKUs (selected period)",
       "visualType": "bar",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 14, "y": 118, "width": 8, "height": 18 },
@@ -1244,16 +1407,17 @@
       "title": "",
       "visualType": "markdownCard",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 167, "width": 22, "height": 4 },
+      "layout": {"x": 0, "y": 177, "width": 22, "height": 4},
       "markdownText": "# Purchases\r\nCosts from commitment discount, Marketplace, and other purchases\r\n\r\n⬆️ [Top](?tile=c0bd4bc4-a910-4a74-89a9-d4ae0f995563) &nbsp; &nbsp; 💜 [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Understand.Summary.Purchases)",
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "4383c893-8839-4678-88c6-9a6393595d0a",
       "title": "Purchases",
       "visualType": "table",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 0, "y": 171, "width": 15, "height": 7 },
+      "layout": {"x": 0, "y": 181, "width": 15, "height": 7},
       "queryRef": { "kind": "query", "queryId": "98c9b9b5-bebf-41f8-8319-5fa2523f9dd0" },
       "visualOptions": {
         "table__enableRenderLinks": true,
@@ -1268,6 +1432,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "84da605b-6a0d-4a2a-aac3-a4160f9de10d",
       "title": "Purchases",
       "visualType": "table",
@@ -1289,10 +1454,10 @@
     {
       "id": "ea97e18e-5253-4a9d-9eed-0f2fc45b3c5b",
       "title": "Cost summary",
-      "description": "List cost is based on retail prices without any discounts, contracted cost includes negotiated discounts, and effective cost includes commitment and negotiated discounts.",
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. List cost is based on retail prices without any discounts, contracted cost includes negotiated discounts, and effective cost includes commitment and negotiated discounts.",
       "visualType": "bar",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 6, "y": 18, "width": 8, "height": 5 },
+      "layout": {"x": 6, "y": 28, "width": 8, "height": 5},
       "queryRef": { "kind": "query", "queryId": "5ff29428-de83-4a2c-8f86-d8beebe68750" },
       "visualOptions": {
         "multipleYAxes": {
@@ -1319,10 +1484,10 @@
     {
       "id": "d9959281-dc89-44fc-a2b3-b4f5227e0179",
       "title": "Savings summary",
-      "description": "Negotiated discounts are based on your contractual agreement and represented in the \"contracted cost\". Commitment discounts are based on reservations and savings plans and represented in the \"effective cost\".",
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. Negotiated discounts are based on your contractual agreement and represented in the \"contracted cost\". Commitment discounts are based on reservations and savings plans and represented in the \"effective cost\".",
       "visualType": "bar",
       "pageId": "f8ee3008-df7e-442f-825e-2e3b46e4c185",
-      "layout": { "x": 14, "y": 18, "width": 8, "height": 5 },
+      "layout": {"x": 14, "y": 28, "width": 8, "height": 5},
       "queryRef": { "kind": "query", "queryId": "f5f240a8-a818-4f27-bdfb-e96fcfe433bd" },
       "visualOptions": {
         "multipleYAxes": {
@@ -1356,8 +1521,9 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "36c1dede-49c9-4ae3-a19a-a230f87e9197",
-      "title": "Commitment discount usage (last n days)",
+      "title": "Commitment discount usage (selected period)",
       "visualType": "table",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 67, "width": 13, "height": 6 },
@@ -1375,8 +1541,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "9513d9d7-be4a-468c-aed0-f0076c9bf3c4",
-      "title": "Savings summary (last n months)",
+      "title": "Savings summary (selected period)",
       "visualType": "multistat",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 8, "width": 15, "height": 9 },
@@ -1469,8 +1636,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "9aec9f5c-f7cc-48da-8f0d-303137623945",
-      "title": "Savings summary (last n days)",
+      "title": "Savings summary (selected period)",
       "visualType": "multistat",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 44, "width": 15, "height": 9 },
@@ -1563,8 +1731,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "e8018da4-7269-4e91-9f32-4bcf390746af",
-      "title": "Commitment discount breakdown (last n months)",
+      "title": "Commitment discount breakdown (selected period)",
       "visualType": "multistat",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 15, "y": 8, "width": 7, "height": 9 },
@@ -1581,8 +1750,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "8dd83ee9-6692-4b94-a8c3-68caa7adbb64",
-      "title": "Commitment discount breakdown (last n days)",
+      "title": "Commitment discount breakdown (selected period)",
       "visualType": "multistat",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 15, "y": 44, "width": 7, "height": 9 },
@@ -1599,6 +1769,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "e69fe03b-606c-4b93-b9b5-6f1048b24deb",
       "title": "Monthly trend by service category",
       "visualType": "table",
@@ -1618,6 +1789,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "df06246e-5feb-4fd1-bcb0-c04448ac4c80",
       "title": "Monthly savings trend",
       "visualType": "stackedcolumn",
@@ -1656,8 +1828,9 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "8f92a18b-9000-48f8-952a-5f21c535105c",
-      "title": "Total savings (last n months)",
+      "title": "Total savings (selected period)",
       "visualType": "pie",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 15, "y": 17, "width": 7, "height": 10 },
@@ -1682,6 +1855,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "b28fdb79-8d7a-414a-9da4-75ab9bffe134",
       "title": "Daily savings trend",
       "visualType": "stackedcolumn",
@@ -1711,8 +1885,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "088944a4-6cc6-4320-a8eb-82d35ee5b5d6",
-      "title": "Total savings (last n days)",
+      "title": "Total savings (selected period)",
       "visualType": "pie",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 15, "y": 53, "width": 7, "height": 10 },
@@ -1773,6 +1948,7 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "b2c319c7-0ef0-477b-a80f-9b6e022b7e5e",
       "title": "Commitment discount chargeback by resource group",
       "visualType": "table",
@@ -1792,6 +1968,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "e22f49e5-766c-4b35-8b4c-b99bef142d42",
       "title": "Commitment discount chargeback by subscription",
       "visualType": "table",
@@ -1811,8 +1988,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "c7e80308-bbb1-4aa8-a3d7-ce9eb0145f92",
-      "title": "Commitment discount usage by resource (last n days)",
+      "title": "Commitment discount usage by resource (selected period)",
       "visualType": "table",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 95, "width": 22, "height": 8 },
@@ -1857,6 +2035,7 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "05764729-51e4-4048-8cf8-2ac56eb3e643",
       "title": "Monthly trend by hub instance",
       "visualType": "stackedcolumn",
@@ -1886,6 +2065,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "37a8bef0-7dfb-42b9-aeab-55f8c9c178b8",
       "title": "Daily trend by hub instance",
       "visualType": "stackedcolumn",
@@ -1915,6 +2095,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "c48e07c5-f0a5-43e2-8a13-ee43ed1b92f9",
       "title": "Monthly trend by hub instance",
       "visualType": "table",
@@ -2261,8 +2442,9 @@
       "visualOptions": {}
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "d2e4a321-9c2c-411b-8a20-19fd86dab3fe",
-      "title": "Hybrid Benefit summary (last n days)",
+      "title": "Hybrid Benefit summary (selected period)",
       "visualType": "multistat",
       "pageId": "a4ec1d55-5b6e-49af-bb9e-4f3d136cdf05",
       "layout": { "x": 0, "y": 9, "width": 6, "height": 15 },
@@ -2279,8 +2461,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "80e1ecb4-69f6-451d-9e1c-f90d17b7f865",
-      "title": "Underutilized vCPU capacity (last n days)",
+      "title": "Underutilized vCPU capacity (selected period)",
       "visualType": "table",
       "pageId": "a4ec1d55-5b6e-49af-bb9e-4f3d136cdf05",
       "layout": { "x": 6, "y": 9, "width": 16, "height": 5 },
@@ -2298,8 +2481,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "59a1756c-7586-4364-8047-604aa7d6f09a",
-      "title": "Fully utilized vCPU capacity (last n days)",
+      "title": "Fully utilized vCPU capacity (selected period)",
       "visualType": "table",
       "pageId": "a4ec1d55-5b6e-49af-bb9e-4f3d136cdf05",
       "layout": { "x": 6, "y": 14, "width": 16, "height": 5 },
@@ -2317,8 +2501,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "9197f822-bdf3-42af-8b43-5609c9b91f00",
-      "title": "Eligible resources (last n days)",
+      "title": "Eligible resources (selected period)",
       "visualType": "table",
       "pageId": "a4ec1d55-5b6e-49af-bb9e-4f3d136cdf05",
       "layout": { "x": 6, "y": 19, "width": 16, "height": 5 },
@@ -2431,7 +2616,7 @@
       "visualType": "markdownCard",
       "pageId": "f416685d-f559-4514-8e45-5e0e09aec286",
       "layout": { "x": 0, "y": 0, "width": 21, "height": 3 },
-      "markdownText": "Invoicing and chargeback refer to the process of receiving, reconciling, and paying provider invoices, and then billing internal teams for their respective cloud costs using existing internal finance tools and processes. With this capability, you break down invoices and cross-charge portions of these invoices to the teams responsible for the charges.\r\n\r\n[Learn more](http://aka.ms/ftk/fx/chargeback) &nbsp; &nbsp; [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Manage.Invoicing)",
+      "markdownText": "**Charge period** filters ordinary costs and trends; defaults to **Month to date** (UTC). For calendar dates choose **Custom date range**, then **Custom charge dates** (end exclusive). Last-month cards remain fixed. Costs reflect imported exports, which can lag billing.\n\nInvoicing and chargeback refer to the process of receiving, reconciling, and paying provider invoices, and then billing internal teams for their respective cloud costs using existing internal finance tools and processes. With this capability, you break down invoices and cross-charge portions of these invoices to the teams responsible for the charges.\r\n\r\n[Learn more](http://aka.ms/ftk/fx/chargeback) &nbsp; &nbsp; [Give feedback](https://portal.azure.com/#view/HubsExtension/InProductFeedbackBlade/extensionName/FinOpsToolkit/cesQuestion/How%20easy%20or%20hard%20is%20it%20to%20use%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/cvaQuestion/How%20valuable%20the%20FinOps%20hubs%20Data%20Explorer%20dashboard%3F/surveyId/FTK14.0/bladeName/Hubs.Dashboard/featureName/Manage.Invoicing)",
       "visualOptions": {}
     },
     {
@@ -2482,8 +2667,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "961b8980-213f-4bc7-9512-8a08614229e0",
-      "title": "Effective Savings Rate (last n months)",
+      "title": "Effective Savings Rate (selected period)",
       "visualType": "multistat",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 17, "width": 15, "height": 4 },
@@ -2591,6 +2777,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "6367a5d7-99ca-4afc-b9d4-4c77ec259a07",
       "title": "Savings breakdown by month",
       "visualType": "table",
@@ -2610,8 +2797,9 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "69e3a7e2-9477-4b63-8c86-9d66a782501b",
-      "title": "Effective Savings Rate (last n days)",
+      "title": "Effective Savings Rate (selected period)",
       "visualType": "multistat",
       "pageId": "306fef9a-c760-4559-a326-7c25d196b616",
       "layout": { "x": 0, "y": 53, "width": 15, "height": 4 },
@@ -2737,6 +2925,7 @@
       }
     },
     {
+      "description": "Follows Charge period. Monthly/Daily trend controls apply only in Trend controls mode. ",
       "id": "2e9d6a7f-6393-41ad-83df-51faddbe3b8e",
       "title": "Effective cost breakdown by month",
       "visualType": "table",
@@ -2786,6 +2975,16 @@
     }
   ],
   "baseQueries": [
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000102",
+      "queryId": "b72860dc-526e-4c14-9556-000000000002",
+      "variableName": "ChargePeriodBounds"
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000103",
+      "queryId": "b72860dc-526e-4c14-9556-000000000003",
+      "variableName": "SelectedPeriodCosts"
+    },
     { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a31", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a21", "variableName": "TagPeriodCosts" },
     { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a32", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a22", "variableName": "TagCostRows" },
     { "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a33", "queryId": "a6c90100-487a-4e37-9b5a-21bbc3b67a23", "variableName": "FilteredTagCostRows" },
@@ -2798,14 +2997,51 @@
   ],
   "parameters": [
     {
+      "kind": "string",
+      "id": "b72860dc-526e-4c14-9556-000000000001",
+      "displayName": "Charge period",
+      "description": "Ordinary cost totals and trends use this charge-date range (UTC). Fixed month comparisons, anomaly history, forecasts and ingestion inventory keep their labeled periods. Trend controls apply only in Trend controls mode.",
+      "variableName": "selectedChargePeriod",
+      "selectionType": "scalar",
+      "includeAllOption": false,
+      "defaultValue": {
+        "kind": "value",
+        "value": "MonthToDate"
+      },
+      "dataSource": {
+        "kind": "static",
+        "values": [
+          {
+            "displayText": "Month to date",
+            "value": "MonthToDate"
+          },
+          {
+            "displayText": "Last month",
+            "value": "LastMonth"
+          },
+          {
+            "displayText": "Custom date range",
+            "value": "Custom"
+          },
+          {
+            "displayText": "Trend controls (original behavior)",
+            "value": "TrendControls"
+          }
+        ]
+      },
+      "showOnPages": {
+        "kind": "all"
+      }
+    },
+    {
       "kind": "duration",
       "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a41",
-      "displayName": "Tag cost period",
-      "description": "Charge-period start dates from the start (inclusive) to the end (exclusive). Defaults to the last 30 days.",
+      "displayName": "Custom charge dates",
+      "description": "Calendar start (inclusive) and end (exclusive), in UTC. Used only when Charge period is Custom date range; the tag page also uses these dates in Trend controls mode.",
       "beginVariableName": "tagCostStart",
       "endVariableName": "tagCostEnd",
       "defaultValue": { "kind": "dynamic", "count": 30, "unit": "days" },
-      "showOnPages": { "kind": "selection", "pageIds": ["a6c90100-487a-4e37-9b5a-21bbc3b67a01"] }
+      "showOnPages": {"kind": "all"}
     },
     {
       "kind": "string",
@@ -2869,7 +3105,7 @@
       "kind": "int",
       "id": "50e8acdc-5d90-4937-96cb-53a9b0ad047f",
       "displayName": "Monthly trend",
-      "description": "How many months should be shown in monthly trend charts and tables?",
+      "description": "How many months should be shown in monthly trend charts and tables? Ordinary totals/trends use this only when Charge period is Trend controls.",
       "variableName": "numberOfMonths",
       "selectionType": "scalar",
       "includeAllOption": false,
@@ -2883,7 +3119,7 @@
       "id": "c016c954-1d37-41fb-8c4e-7607a9be2e96",
       "displayName": "Daily trend",
       "variableName": "numberOfDays",
-      "description": "How many days should be shown in daily trend charts and tables? Does not apply to \"this month and last\" queries.",
+      "description": "How many days should be shown in daily trend charts and tables? Does not apply to \"this month and last\" queries. Ordinary totals/trends use this only when Charge period is Trend controls.",
       "defaultValue": { "kind": "value", "value": 28 },
       "showOnPages": { "kind": "all" }
     },
@@ -2930,16 +3166,76 @@
   ],
   "queries": [
     {
+      "id": "b72860dc-526e-4c14-9556-000000000012",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6"
+      },
+      "text": "CostsThisMonth\n| summarize BilledCost = sum(BilledCost), EffectiveCost = sum(EffectiveCost),\n    ContractedCost = sum(ContractedCost), ListCost = sum(ListCost)\n    by Month = startofmonth(ChargePeriodStart), BillingCurrency\n| extend Values = pack_array(\n    bag_pack('Type', 'Billed cost', 'Cost', BilledCost),\n    bag_pack('Type', 'Effective cost', 'Cost', EffectiveCost),\n    bag_pack('Type', 'Commitment savings', 'Cost', ContractedCost - EffectiveCost),\n    bag_pack('Type', 'Negotiated savings', 'Cost', ListCost - ContractedCost))\n| mv-expand Values\n| project Label = strcat(tostring(Values.Type), ' (', format_datetime(Month, 'MMM yyyy'), ', ', BillingCurrency, ')'),\n    Count = round(todouble(Values.Cost), 2), IsThisMonth = true",
+      "usedVariables": [
+        "CostsThisMonth"
+      ]
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000006",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "CostsThisMonth\n| summarize BilledCost = round(sum(BilledCost), 2), EffectiveCost = round(sum(EffectiveCost), 2) by Month = startofmonth(ChargePeriodStart), BillingCurrency\n| extend Values = pack_array(bag_pack('Type', 'Billed cost', 'Cost', BilledCost), bag_pack('Type', 'Effective cost', 'Cost', EffectiveCost))\n| mv-expand Values\n| project Type = strcat(tostring(Values.Type), ' (', format_datetime(Month, 'MMM yyyy'), ', ', BillingCurrency, ')'), Cost = todouble(Values.Cost)",
+      "usedVariables": ["CostsThisMonth"]
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000007",
+      "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
+      "text": "let data = materialize(\n    CostsThisMonth\n    | summarize\n        Subscriptions = dcount(SubAccountId),\n        ResourceGroups = dcount(strcat(SubAccountId, x_ResourceGroupName)),\n        Resources = dcount(ResourceId),\n        Services = dcount(ServiceName)\n    | project json = todynamic(strcat('[{ \"Type\":\"Subscriptions\", \"Count\":', Subscriptions, ' }, { \"Type\":\"Resource groups\", \"Count\":', ResourceGroups, ' }, { \"Type\":\"Resources\", \"Count\":', Resources, ' }, { \"Type\":\"Services\", \"Count\":', Services, ' }]'))\n    | mv-expand json\n    | project Label = tostring(json.Type), Count = tolong(json.Count)\n);\ndata",
+      "usedVariables": ["CostsThisMonth"]
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000002",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6"
+      },
+      "text": "print StartDate = case(\n    selectedChargePeriod == 'MonthToDate', startofmonth(now()),\n    selectedChargePeriod == 'LastMonth', startofmonth(now(), -1),\n    tagCostStart),\n    EndDate = case(\n    selectedChargePeriod == 'MonthToDate', now(),\n    selectedChargePeriod == 'LastMonth', startofmonth(now()),\n    tagCostEnd)",
+      "usedVariables": [
+        "selectedChargePeriod",
+        "tagCostStart",
+        "tagCostEnd"
+      ]
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000003",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6"
+      },
+      "text": "CostsPlus\n| where selectedChargePeriod == 'TrendControls'\n    or (ChargePeriodStart >= toscalar(ChargePeriodBounds | project StartDate)\n        and ChargePeriodStart < toscalar(ChargePeriodBounds | project EndDate))",
+      "usedVariables": [
+        "CostsPlus",
+        "selectedChargePeriod",
+        "ChargePeriodBounds"
+      ]
+    },
+    {
+      "id": "b72860dc-526e-4c14-9556-000000000004",
+      "dataSource": {
+        "kind": "inline",
+        "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6"
+      },
+      "text": "CostsByDay\n| summarize BilledCost = round(sum(BilledCost), 2), EffectiveCost = round(sum(EffectiveCost), 2) by BillingCurrency\n| extend Values = pack_array(\n    bag_pack('Type', 'Billed cost', 'Cost', BilledCost),\n    bag_pack('Type', 'Effective cost', 'Cost', EffectiveCost))\n| mv-expand Values\n| project Type = strcat(tostring(Values.Type), ' (', BillingCurrency, ')'), Cost = todouble(Values.Cost)",
+      "usedVariables": [
+        "CostsByDay"
+      ]
+    },
+    {
       "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a21",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "SubscriptionCosts(tagCostStart, tagCostEnd, selectedBillingCurrency)",
-      "usedVariables": ["tagCostStart", "tagCostEnd", "selectedBillingCurrency"]
+      "text": "SubscriptionCosts(toscalar(ChargePeriodBounds | project StartDate), toscalar(ChargePeriodBounds | project EndDate), selectedBillingCurrency)",
+      "usedVariables": ["ChargePeriodBounds", "selectedBillingCurrency"]
     },
     {
       "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a22",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "SubscriptionTagCosts(tagCostStart, tagCostEnd, selectedBillingCurrency)\n| extend TagNameKey = tostring(pack_array(HasTag, TagName)), TagPairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))",
-      "usedVariables": ["tagCostStart", "tagCostEnd", "selectedBillingCurrency"]
+      "text": "SubscriptionTagCosts(toscalar(ChargePeriodBounds | project StartDate), toscalar(ChargePeriodBounds | project EndDate), selectedBillingCurrency)\n| extend TagNameKey = tostring(pack_array(HasTag, TagName)), TagPairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))",
+      "usedVariables": ["ChargePeriodBounds", "selectedBillingCurrency"]
     },
     {
       "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a23",
@@ -2986,8 +3282,8 @@
     {
       "id": "a6c90100-487a-4e37-9b5a-21bbc3b67a50",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "ResourceTagCosts(tagCostStart, tagCostEnd, selectedBillingCurrency)\n| extend TagNameKey = tostring(pack_array(HasTag, TagName)), TagPairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))\n| where selectedTagSource == 'Both' or TagSource == selectedTagSource\n| where isnull(selectedTagSubscriptions) or SubscriptionId in (selectedTagSubscriptions)\n| where isnull(selectedTagNames) or TagNameKey in (selectedTagNames)\n| where isnull(selectedTagPairs) or TagPairKey in (selectedTagPairs)\n| project SubscriptionName, ResourceName, ResourceGroup, ResourceType, TagSource, TagName, TagValue, TagBasis, BillingCurrency,\n    MatchingTagBilledCost = round(TagBilledCost, 2), MatchingTagEffectiveCost = round(TagEffectiveCost, 2),\n    FullResourceBilledCost = round(ResourceBilledCost, 2), FullResourceEffectiveCost = round(ResourceEffectiveCost, 2),\n    TagCostRecordCount, ResourceCostRecordCount, CostStatus, ResourceStatus, InCurrentInventory,\n    CurrentResourceTags, ResourceInventoryAsOf, SubscriptionTagsAsOf, Location, SubscriptionId, ResourceId\n| order by SubscriptionName asc, SubscriptionId asc, ResourceName asc, ResourceId asc, TagSource asc, TagName asc, TagValue asc, BillingCurrency asc",
-      "usedVariables": ["tagCostStart", "tagCostEnd", "selectedBillingCurrency", "selectedTagSource", "selectedTagSubscriptions", "selectedTagNames", "selectedTagPairs"]
+      "text": "ResourceTagCosts(toscalar(ChargePeriodBounds | project StartDate), toscalar(ChargePeriodBounds | project EndDate), selectedBillingCurrency)\n| extend TagNameKey = tostring(pack_array(HasTag, TagName)), TagPairKey = tostring(pack_array(TagSource, HasTag, TagName, TagValue))\n| where selectedTagSource == 'Both' or TagSource == selectedTagSource\n| where isnull(selectedTagSubscriptions) or SubscriptionId in (selectedTagSubscriptions)\n| where isnull(selectedTagNames) or TagNameKey in (selectedTagNames)\n| where isnull(selectedTagPairs) or TagPairKey in (selectedTagPairs)\n| project SubscriptionName, ResourceName, ResourceGroup, ResourceType, TagSource, TagName, TagValue, TagBasis, BillingCurrency,\n    MatchingTagBilledCost = round(TagBilledCost, 2), MatchingTagEffectiveCost = round(TagEffectiveCost, 2),\n    FullResourceBilledCost = round(ResourceBilledCost, 2), FullResourceEffectiveCost = round(ResourceEffectiveCost, 2),\n    TagCostRecordCount, ResourceCostRecordCount, CostStatus, ResourceStatus, InCurrentInventory,\n    CurrentResourceTags, ResourceInventoryAsOf, SubscriptionTagsAsOf, Location, SubscriptionId, ResourceId\n| order by SubscriptionName asc, SubscriptionId asc, ResourceName asc, ResourceId asc, TagSource asc, TagName asc, TagValue asc, BillingCurrency asc",
+      "usedVariables": ["ChargePeriodBounds", "selectedBillingCurrency", "selectedTagSource", "selectedTagSubscriptions", "selectedTagNames", "selectedTagPairs"]
     },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
@@ -3057,9 +3353,9 @@
     },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "let monthname = dynamic(['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);\nlet data = materialize(\n    CostsByMonth\n    | where ChargePeriodStart >= startofmonth(now(), -1)\n    | summarize \n        BilledCost = sum(BilledCost),\n        EffectiveCost = sum(EffectiveCost),\n        ContractedCost = sum(ContractedCost),\n        ListCost = sum(ListCost)\n        by\n        ChargePeriodStart\n    | order by ChargePeriodStart asc\n    | extend CommitmentDiscountSavings = ContractedCost - EffectiveCost\n    | extend NegotiatedDiscountSavings = ListCost - ContractedCost\n    | extend Month = monthname[monthofyear(ChargePeriodStart)]\n    | project json = todynamic(strcat('[{ \"Type\":\"Billed cost\", \"Count\":', BilledCost, ' }, { \"Type\":\"Effective cost\", \"Count\":', EffectiveCost, ' }, { \"Type\":\"Commitment savings\", \"Count\":', CommitmentDiscountSavings, ' }, { \"Type\":\"Negotiated savings\", \"Count\":', NegotiatedDiscountSavings, ' }]')), Month, IsThisMonth = ChargePeriodStart >= startofmonth(now())\n    | mv-expand json\n    | project Label = strcat(json.Type, ' (', Month, ')'), Count = tolong(json.Count), IsThisMonth\n);\ndata",
+      "text": "let monthname = dynamic(['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']);\nlet data = materialize(\n    CostsPlus\n    | where ChargePeriodStart >= startofmonth(now(), -1) and ChargePeriodStart < startofmonth(now())\n    | extend ChargePeriodStart = startofmonth(ChargePeriodStart)\n    | summarize \n        BilledCost = sum(BilledCost),\n        EffectiveCost = sum(EffectiveCost),\n        ContractedCost = sum(ContractedCost),\n        ListCost = sum(ListCost)\n        by\n        ChargePeriodStart\n    | order by ChargePeriodStart asc\n    | extend CommitmentDiscountSavings = ContractedCost - EffectiveCost\n    | extend NegotiatedDiscountSavings = ListCost - ContractedCost\n    | extend Month = monthname[monthofyear(ChargePeriodStart)]\n    | project json = todynamic(strcat('[{ \"Type\":\"Billed cost\", \"Count\":', BilledCost, ' }, { \"Type\":\"Effective cost\", \"Count\":', EffectiveCost, ' }, { \"Type\":\"Commitment savings\", \"Count\":', CommitmentDiscountSavings, ' }, { \"Type\":\"Negotiated savings\", \"Count\":', NegotiatedDiscountSavings, ' }]')), Month, IsThisMonth = ChargePeriodStart >= startofmonth(now())\n    | mv-expand json\n    | project Label = strcat(json.Type, ' (', Month, ')'), Count = tolong(json.Count), IsThisMonth\n);\ndata",
       "id": "e8b343dc-7430-4487-8d44-ef48ac454f2d",
-      "usedVariables": ["CostsByMonth"]
+      "usedVariables": ["CostsPlus"]
     },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
@@ -3195,9 +3491,9 @@
     },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "let costs = CostsByDay\n| where isnotempty(ResourceType);\ncosts | summarize Value = tostring(dcount(ResourceId)) by Label = \"Resources\", Order = 10\n| union (costs | summarize Value = tostring(dcount(ResourceType)) by Label = \"Resource types\", Order = 11)\n| union (costs | summarize Count = dcount(ResourceId) by Value = ResourceType | order by Count desc | limit 1 | extend Label = \"Most used\", Order = 21)\n| union (costs | summarize sum(EffectiveCost) by Value = ResourceType | order by sum_EffectiveCost desc | limit 1 | extend Label = \"Most cost\", Order = 22)\n| union (costs | summarize AllTypes = dcount(ResourceType), CommittedTypes = dcountif(ResourceType, isnotempty(CommitmentDiscountType)) by Label = \"Covered by commitment discounts\", Order = 31 | extend Value = strcat(round(1.0 * CommittedTypes / AllTypes * 100, 1), '%'))\n| union (costs | summarize Savings = sum(ListCost - EffectiveCost) by Value = ResourceType | order by Savings desc | limit 1 | extend Label = \"Most savings\", Order = 32)\n| union (costs | summarize CostPerResource = sum(EffectiveCost) / dcount(ResourceId) by Value = ResourceType | order by CostPerResource desc | limit 1 | extend Label = \"Most expensive (cost / resource)\", Order = 41)\n| union (costs | where ResourceType !in (CostsPlus | where ChargePeriodStart < ago(numberOfDays * 1d) - 1d | distinct ResourceType) | summarize Count = dcount(ResourceId) by ResourceType | order by Count desc | as d | count | extend Label = \"New in last n days\", Value = case(Count == 0, '(none)', Count == 1, toscalar(d | project ResourceType), strcat(toscalar(d | limit 1 | project ResourceType), ' and ', (Count - 1), ' more')), Order = 42)\n| order by Order asc\n",
+      "text": "let costs = CostsByDay\n| where isnotempty(ResourceType);\ncosts | summarize Value = tostring(dcount(ResourceId)) by Label = \"Resources\", Order = 10\n| union (costs | summarize Value = tostring(dcount(ResourceType)) by Label = \"Resource types\", Order = 11)\n| union (costs | summarize Count = dcount(ResourceId) by Value = ResourceType | order by Count desc | limit 1 | extend Label = \"Most used\", Order = 21)\n| union (costs | summarize sum(EffectiveCost) by Value = ResourceType | order by sum_EffectiveCost desc | limit 1 | extend Label = \"Most cost\", Order = 22)\n| union (costs | summarize AllTypes = dcount(ResourceType), CommittedTypes = dcountif(ResourceType, isnotempty(CommitmentDiscountType)) by Label = \"Covered by commitment discounts\", Order = 31 | extend Value = strcat(round(1.0 * CommittedTypes / AllTypes * 100, 1), '%'))\n| union (costs | summarize Savings = sum(ListCost - EffectiveCost) by Value = ResourceType | order by Savings desc | limit 1 | extend Label = \"Most savings\", Order = 32)\n| union (costs | summarize CostPerResource = sum(EffectiveCost) / dcount(ResourceId) by Value = ResourceType | order by CostPerResource desc | limit 1 | extend Label = \"Most expensive (cost / resource)\", Order = 41)\n| union (costs | where ResourceType !in (Costs_v1_2 | where isempty(selectedBillingCurrency) or BillingCurrency == selectedBillingCurrency | where ChargePeriodStart < iff(selectedChargePeriod == 'TrendControls', ago(numberOfDays * 1d) - 1d, toscalar(ChargePeriodBounds | project StartDate)) | distinct ResourceType) | summarize Count = dcount(ResourceId) by ResourceType | order by Count desc | as d | count | extend Label = \"New in selected period\", Value = case(Count == 0, '(none)', Count == 1, toscalar(d | project ResourceType), strcat(toscalar(d | limit 1 | project ResourceType), ' and ', (Count - 1), ' more')), Order = 42)\n| order by Order asc\n",
       "id": "f062533b-8c94-412f-bf83-0eb5cd06063d",
-      "usedVariables": ["CostsByDay", "CostsPlus", "numberOfDays"]
+      "usedVariables": ["CostsByDay", "numberOfDays", "selectedChargePeriod", "ChargePeriodBounds", "selectedBillingCurrency"]
     },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
@@ -3466,8 +3762,8 @@
     {
       "id": "43612ae4-c475-4f22-bb50-ce9d995abb8f",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "CostsPlus\n| where startofmonth(BillingPeriodStart) == startofmonth(now())",
-      "usedVariables": ["CostsPlus"]
+      "text": "Costs_v1_2\n| where ChargePeriodStart >= startofmonth(now()) and ChargePeriodStart < now()\n| where isempty(selectedBillingCurrency) or BillingCurrency == selectedBillingCurrency",
+      "usedVariables": ["selectedBillingCurrency"]
     },
     {
       "id": "cb1f5404-c0b1-42fd-99fb-3cff7b08daaa",
@@ -3478,21 +3774,21 @@
     {
       "id": "4ce0f587-2d45-436c-8f79-102c6b382439",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "CostsPlus\r\n| where startofmonth(ChargePeriodStart) >= startofmonth(now(), -numberOfMonths)\r\n| extend ChargePeriodStart = startofmonth(ChargePeriodStart)\r\n| extend BillingPeriodStart = startofmonth(BillingPeriodStart)",
-      "usedVariables": ["CostsPlus", "numberOfMonths"]
+      "text": "SelectedPeriodCosts\n| where selectedChargePeriod != 'TrendControls' or startofmonth(ChargePeriodStart) >= startofmonth(now(), -numberOfMonths)\n| extend ChargePeriodStart = startofmonth(ChargePeriodStart)\n| extend BillingPeriodStart = startofmonth(BillingPeriodStart)",
+      "usedVariables": ["SelectedPeriodCosts", "selectedChargePeriod", "numberOfMonths"]
     },
     {
       "id": "6b598467-8c31-4693-b1eb-7ed683fcfc3a",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "CostsPlus\r\n| where ChargePeriodStart >= ago(numberOfDays * 1d) - 1d and ChargePeriodStart < ago(1d)\r\n| extend ChargePeriodStart = startofday(ChargePeriodStart)",
-      "usedVariables": ["CostsPlus", "numberOfDays"]
+      "text": "SelectedPeriodCosts\n| where selectedChargePeriod != 'TrendControls'\n    or (ChargePeriodStart >= ago(numberOfDays * 1d) - 1d and ChargePeriodStart < ago(1d))\n| extend ChargePeriodStart = startofday(ChargePeriodStart)",
+      "usedVariables": ["SelectedPeriodCosts", "selectedChargePeriod", "numberOfDays"]
     },
-    { "id": "4a1973bf-08e9-4e82-b8e6-6edff81cf0a5", "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" }, "text": "CostsPlus", "usedVariables": ["CostsPlus"] },
+    { "id": "4a1973bf-08e9-4e82-b8e6-6edff81cf0a5", "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" }, "text": "SelectedPeriodCosts", "usedVariables": ["SelectedPeriodCosts"] },
     {
       "id": "eb9259cc-05b7-4441-a66d-a29026fe371b",
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },
-      "text": "Costs_v1_2\n//\n// Apply summarization settings\n| where ChargePeriodStart >= monthsago(numberOfMonths)\n| where isempty(selectedBillingCurrency) or BillingCurrency == selectedBillingCurrency\n| as filteredCosts\n| extend x_ChargeMonth = startofmonth(ChargePeriodStart)\n// TODO: Should we add granularity? -- | extend x_ReportingDate = iff(#\"Default Granularity\" == 'Monthly'), x_ChargeMonth, startofday(ChargePeriodStart))\n//\n// SKU details\n| extend x_SkuUsageType = tostring(coalesce(SkuPriceDetails.x_UsageType, x_SkuDetails.UsageType))\n| extend x_SkuLicenseUnusedQuantity = x_SkuLicenseQuantity - x_SkuCoreCount\n//\n// Commitment discounts\n| extend x_CommitmentDiscountKey = iff(isempty(x_SkuInstanceType), '', strcat(x_SkuInstanceType, x_SkuMeterId))\n| extend x_SkuTermLabel = case(isempty(x_SkuTerm) or x_SkuTerm <= 0, '', x_SkuTerm < 12, strcat(x_SkuTerm, ' month', iff(x_SkuTerm != 1, 's', '')), strcat(x_SkuTerm / 12, ' year', iff(x_SkuTerm != 12, 's', '')))\n//\n// CSP partners\n// x_PartnerBilledCredit = iff(x_PartnerCreditApplied, BilledCost * x_PartnerCreditRate, todouble(0))\n// x_PartnerEffectiveCredit = iff(x_PartnerCreditApplied, EffectiveCost * x_PartnerCreditRate, todouble(0))\n//\n// Toolkit\n| extend x_ToolkitTool = tostring(Tags['ftk-tool'])\n| extend x_ToolkitVersion = tostring(Tags['ftk-version'])\n| extend tmp_ResourceParent = database('Ingestion').parse_resourceid(Tags['cm-resource-parent'])\n| extend x_ResourceParentId = tostring(tmp_ResourceParent.ResourceId)\n| extend x_ResourceParentName = tostring(tmp_ResourceParent.ResourceName)\n| extend x_ResourceParentType = tostring(tmp_ResourceParent.ResourceType)\n//\n// TODO: Only add differentiators when the name is not unique\n| extend CommitmentDiscountNameUnique = iff(isempty(CommitmentDiscountId), '', strcat(CommitmentDiscountName, ' (', CommitmentDiscountType, ')'))\n| extend ResourceNameUnique           = iff(isempty(ResourceId),           '', strcat(ResourceName,           ' (', ResourceType, ')'))\n| extend x_ResourceGroupNameUnique    = iff(isempty(x_ResourceGroupName),  '', strcat(x_ResourceGroupName,    ' (', SubAccountName, ')'))\n| extend SubAccountNameUnique         = iff(isempty(SubAccountId),         '', strcat(SubAccountName,         ' (', split(SubAccountId, '/')[3], ')'))\n//\n// Explain why cost is 0\n| extend x_FreeReason = case(\n    BilledCost != 0.0 or EffectiveCost != 0.0, '',\n    PricingCategory == 'Committed', strcat('Unknown ', CommitmentDiscountStatus, ' Commitment'),\n    x_BilledUnitPrice == 0.0 and x_EffectiveUnitPrice == 0.0 and ContractedUnitPrice == 0.0 and ListUnitPrice == 0.0 and isempty(CommitmentDiscountType), case(\n        x_SkuDescription contains 'Trial', 'Trial',\n        x_SkuDescription contains 'Preview', 'Preview',\n        'Other'\n    ),\n    x_BilledUnitPrice > 0.0 or x_EffectiveUnitPrice > 0.0, case(\n        PricingQuantity > 0.0, 'Low Usage',\n        PricingQuantity == 0.0, 'No Usage',\n        'Unknown Negative Quantity'\n    ),\n    'Unknown'\n)\n//\n| extend x_ResourceTop1K = ChargeCategory != 'Usage' or isempty(ResourceId) or ResourceId in (\n    filteredCosts\n    | where isnotempty(ResourceId) and ChargeCategory == 'Usage'\n    | summarize sum(EffectiveCost) by ResourceId\n    | order by sum_EffectiveCost desc\n    | limit 1000\n    | distinct ResourceId\n)\n//\n| project-away tmp_ResourceParent",
-      "usedVariables": ["numberOfMonths", "selectedBillingCurrency"]
+      "text": "Costs_v1_2\n//\n// Apply summarization settings\n| where ChargePeriodStart >= monthsago(numberOfMonths)\n    or (selectedChargePeriod != 'TrendControls'\n        and ChargePeriodStart >= toscalar(ChargePeriodBounds | project StartDate)\n        and ChargePeriodStart < toscalar(ChargePeriodBounds | project EndDate))\n| where isempty(selectedBillingCurrency) or BillingCurrency == selectedBillingCurrency\n| as filteredCosts\n| extend x_ChargeMonth = startofmonth(ChargePeriodStart)\n// TODO: Should we add granularity? -- | extend x_ReportingDate = iff(#\"Default Granularity\" == 'Monthly'), x_ChargeMonth, startofday(ChargePeriodStart))\n//\n// SKU details\n| extend x_SkuUsageType = tostring(coalesce(SkuPriceDetails.x_UsageType, x_SkuDetails.UsageType))\n| extend x_SkuLicenseUnusedQuantity = x_SkuLicenseQuantity - x_SkuCoreCount\n//\n// Commitment discounts\n| extend x_CommitmentDiscountKey = iff(isempty(x_SkuInstanceType), '', strcat(x_SkuInstanceType, x_SkuMeterId))\n| extend x_SkuTermLabel = case(isempty(x_SkuTerm) or x_SkuTerm <= 0, '', x_SkuTerm < 12, strcat(x_SkuTerm, ' month', iff(x_SkuTerm != 1, 's', '')), strcat(x_SkuTerm / 12, ' year', iff(x_SkuTerm != 12, 's', '')))\n//\n// CSP partners\n// x_PartnerBilledCredit = iff(x_PartnerCreditApplied, BilledCost * x_PartnerCreditRate, todouble(0))\n// x_PartnerEffectiveCredit = iff(x_PartnerCreditApplied, EffectiveCost * x_PartnerCreditRate, todouble(0))\n//\n// Toolkit\n| extend x_ToolkitTool = tostring(Tags['ftk-tool'])\n| extend x_ToolkitVersion = tostring(Tags['ftk-version'])\n| extend tmp_ResourceParent = database('Ingestion').parse_resourceid(Tags['cm-resource-parent'])\n| extend x_ResourceParentId = tostring(tmp_ResourceParent.ResourceId)\n| extend x_ResourceParentName = tostring(tmp_ResourceParent.ResourceName)\n| extend x_ResourceParentType = tostring(tmp_ResourceParent.ResourceType)\n//\n// TODO: Only add differentiators when the name is not unique\n| extend CommitmentDiscountNameUnique = iff(isempty(CommitmentDiscountId), '', strcat(CommitmentDiscountName, ' (', CommitmentDiscountType, ')'))\n| extend ResourceNameUnique           = iff(isempty(ResourceId),           '', strcat(ResourceName,           ' (', ResourceType, ')'))\n| extend x_ResourceGroupNameUnique    = iff(isempty(x_ResourceGroupName),  '', strcat(x_ResourceGroupName,    ' (', SubAccountName, ')'))\n| extend SubAccountNameUnique         = iff(isempty(SubAccountId),         '', strcat(SubAccountName,         ' (', split(SubAccountId, '/')[3], ')'))\n//\n// Explain why cost is 0\n| extend x_FreeReason = case(\n    BilledCost != 0.0 or EffectiveCost != 0.0, '',\n    PricingCategory == 'Committed', strcat('Unknown ', CommitmentDiscountStatus, ' Commitment'),\n    x_BilledUnitPrice == 0.0 and x_EffectiveUnitPrice == 0.0 and ContractedUnitPrice == 0.0 and ListUnitPrice == 0.0 and isempty(CommitmentDiscountType), case(\n        x_SkuDescription contains 'Trial', 'Trial',\n        x_SkuDescription contains 'Preview', 'Preview',\n        'Other'\n    ),\n    x_BilledUnitPrice > 0.0 or x_EffectiveUnitPrice > 0.0, case(\n        PricingQuantity > 0.0, 'Low Usage',\n        PricingQuantity == 0.0, 'No Usage',\n        'Unknown Negative Quantity'\n    ),\n    'Unknown'\n)\n//\n| extend x_ResourceTop1K = ChargeCategory != 'Usage' or isempty(ResourceId) or ResourceId in (\n    filteredCosts\n    | where isnotempty(ResourceId) and ChargeCategory == 'Usage'\n    | summarize sum(EffectiveCost) by ResourceId\n    | order by sum_EffectiveCost desc\n    | limit 1000\n    | distinct ResourceId\n)\n//\n| project-away tmp_ResourceParent",
+      "usedVariables": ["numberOfMonths", "selectedBillingCurrency", "selectedChargePeriod", "ChargePeriodBounds"]
     },
     {
       "dataSource": { "kind": "inline", "dataSourceId": "23540be2-ffc9-4b61-8c4c-05e493e682a6" },

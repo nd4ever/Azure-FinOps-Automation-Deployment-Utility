@@ -49,17 +49,27 @@ let selectedTagSource = 'Both';
 let selectedTagSubscriptions = dynamic(null);
 let selectedTagNames = dynamic(null);
 let selectedTagPairs = dynamic(null);
+let selectedChargePeriod = 'MonthToDate';
+let numberOfMonths = 1;
+let numberOfDays = 28;
+let Costs_v1_2 = Costs() | extend ListCost = BilledCost, ContractedCost = BilledCost, CommitmentDiscountType = '', ServiceName = 'Test service';
+let CostsPlus = Costs_v1_2 | extend BillingPeriodStart = ChargePeriodStart;
 """;
 using var dashboard = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "finops-hub-dashboard.json")));
 var queries = dashboard.RootElement.GetProperty("queries").EnumerateArray()
     .ToDictionary(item => item.GetProperty("id").GetString()!, item => item);
 var bases = dashboard.RootElement.GetProperty("baseQueries").EnumerateArray()
-    .Where(item => item.GetProperty("variableName").GetString() is "TagPeriodCosts" or "TagCostRows" or "FilteredTagCostRows")
+    .Where(item => item.GetProperty("variableName").GetString() is "TagPeriodCosts" or "TagCostRows" or "FilteredTagCostRows"
+        or "ChargePeriodBounds" or "SelectedPeriodCosts" or "CostsByMonth" or "CostsByDay" or "CostsByDayAHB" or "CostsThisMonth")
     .ToDictionary(item => item.GetProperty("variableName").GetString()!,
         item => item.GetProperty("queryId").GetString()!);
 var failures = 0;
 var checkedQueries = 0;
-foreach (var query in queries.Values.Where(item => item.GetProperty("id").GetString()!.StartsWith("a6c90100-"))) {
+var periodQueryIds = bases.Where(item => item.Key is "ChargePeriodBounds" or "SelectedPeriodCosts" or "CostsThisMonth"
+    or "CostsByMonth" or "CostsByDay" or "CostsByDayAHB").Select(item => item.Value).ToHashSet();
+foreach (var query in queries.Values.Where(item => item.GetProperty("id").GetString()!.StartsWith("a6c90100-")
+    || item.GetProperty("id").GetString()!.StartsWith("b72860dc-") || periodQueryIds.Contains(item.GetProperty("id").GetString()!)
+    || item.GetProperty("id").GetString() is "f062533b-8c94-412f-bf83-0eb5cd06063d" or "e8b343dc-7430-4487-8d44-ef48ac454f2d")) {
     var declarations = new List<string>();
     var emitted = new HashSet<string>();
     void IncludeBase(string name) {
@@ -81,12 +91,43 @@ foreach (var query in queries.Values.Where(item => item.GetProperty("id").GetStr
     checkedQueries++;
 }
 var assertions = File.ReadAllText(Path.Combine(root, "tests", "resource_cost_assertions.kql"));
-var assertionQuery = fixtures + "\n" + definitions + "\n" + assertions;
+var periodFunctions = """
+let boundaryCosts = datatable(ChargePeriodStart:datetime, BillingPeriodStart:datetime, BilledCost:real, EffectiveCost:real, BillingCurrency:string)
+[
+    datetime(2026-09-30T23:59:59.9999999Z), datetime(2026-09-01), 100.0, 80.0, 'USD',
+    datetime(2026-10-01), datetime(2026-09-01), 10.0, 8.0, 'USD',
+    datetime(2026-10-13T23:59:59.9999999Z), datetime(2026-10-01), 20.0, 16.0, 'USD',
+    datetime(2026-10-14), datetime(2026-10-01), 30.0, 24.0, 'USD',
+    datetime(2026-10-14T12:00:00Z), datetime(2026-10-01), 40.0, 32.0, 'USD',
+    datetime(2026-11-01), datetime(2026-11-01), 50.0, 40.0, 'USD'
+];
+""" + "\nlet ResolveChargePeriod = (selectedChargePeriod:string, tagCostStart:datetime, tagCostEnd:datetime, asOf:datetime) {\n"
+    + queries[bases["ChargePeriodBounds"]].GetProperty("text").GetString()!.Replace("now()", "asOf") + "\n};\n"
+    + "let SelectPeriodCosts = (selectedChargePeriod:string, tagCostStart:datetime, tagCostEnd:datetime, asOf:datetime) {\n"
+    + "let ChargePeriodBounds = ResolveChargePeriod(selectedChargePeriod, tagCostStart, tagCostEnd, asOf);\n"
+    + queries[bases["SelectedPeriodCosts"]].GetProperty("text").GetString()!.Replace("CostsPlus", "boundaryCosts") + "\n};\n";
+periodFunctions += "let FixedCurrentMonthCosts = (asOf:datetime, selectedBillingCurrency:string) {\n"
+    + queries[bases["CostsThisMonth"]].GetProperty("text").GetString()!
+        .Replace("Costs_v1_2", "boundaryCosts").Replace("now()", "asOf") + "\n};\n";
+var dateAssertions = File.ReadAllText(Path.Combine(root, "tests", "date_range_assertions.kql"));
+var assertionQuery = fixtures + "\n" + definitions + "\n" + periodFunctions
+    + "\nlet resourceChecks = () {\n" + assertions + "\n};\n"
+    + "let dateChecks = () {\n" + dateAssertions + "\n};\nunion resourceChecks(), dateChecks()\n| order by Check asc";
 foreach (var diagnostic in KustoCode.ParseAndAnalyze(assertionQuery).GetDiagnostics()
     .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)) {
-    Console.Error.WriteLine($"Resource assertions: {diagnostic.Message} at {diagnostic.Start}");
+    Console.Error.WriteLine($"Resource/date assertions: {diagnostic.Message} at {diagnostic.Start}");
+    failures++;
+}
+var costPrefix = queries["eb9259cc-05b7-4441-a66d-a29026fe371b"].GetProperty("text").GetString()!.Split("| as filteredCosts")[0];
+var prefixQuery = fixtures + "\n"
+    + "let monthsago = (months:int) { startofmonth(now(), -months) };\n"
+    + "let ChargePeriodBounds = (" + queries[bases["ChargePeriodBounds"]].GetProperty("text").GetString() + ");\n"
+    + costPrefix;
+foreach (var diagnostic in KustoCode.ParseAndAnalyze(prefixQuery).GetDiagnostics()
+    .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)) {
+    Console.Error.WriteLine($"CostsPlus date filter: {diagnostic.Message} at {diagnostic.Start}");
     failures++;
 }
 if (failures != 0) throw new Exception($"{failures} KQL syntax/semantic errors.");
 if (args.Length == 2) File.WriteAllText(args[1], assertionQuery);
-Console.WriteLine($"PASS: {checkedQueries} dashboard queries, all four Hub functions and resource assertions analyzed with typed fixtures.");
+Console.WriteLine($"PASS: {checkedQueries} dashboard queries, CostsPlus date filter, all four Hub functions and resource/date assertions analyzed with typed fixtures (not executed).");

@@ -441,13 +441,36 @@ Copilot works on paid Fabric capacities (F2 and larger, but not trial capacities
 - The hub pipelines load every export run into Fabric automatically, and the dashboard always shows live data.
 - Subscription-level tags and current ARM resource inventory are separate snapshots refreshed during deployment or with `Update-SubscriptionTagInventory.ps1`; daily cost exports do not refresh them.
 
+### Charge-date range filtering
+
+The Fabric dashboard's top **Charge period** selector defaults to **Month to date**. It filters ordinary cost totals, monthly/daily trends, savings and licensing views, and the subscription/resource tag tables by `ChargePeriodStart`, not billing month. Dates are UTC; the start is inclusive and the end is exclusive.
+
+| Selection | Date range |
+|---|---|
+| Month to date | First day of the current UTC month through the current time |
+| Last month | Entire previous UTC calendar month |
+| Custom date range | Choose start/end calendar dates and times using **Custom charge dates** |
+| Trend controls (original behavior) | Restore the existing Monthly/Daily trend windows; the tag page uses Custom charge dates, defaulting to the last 30 days |
+
+For October 1–13 inclusive, select **Custom date range**, with start **October 1 at 00:00** and end **October 14 at 00:00 UTC**. Explicit ranges override Monthly/Daily trend counts, so selecting one month does not silently exclude older custom dates or recent daily costs. Currency and group-count controls still apply.
+
+**Invoicing + chargeback** shows **Selected-period cost** as the primary billed/effective cost card beside the trends. Below it, a fixed **Current month** section contains month-to-date billed/effective costs and distinct subscription/resource-group/resource/service counts. A fixed **Last month** section follows with the existing previous-month cost and count cards.
+
+**Summary** also has a fixed **Current month** section for billed cost, effective cost, commitment savings and negotiated savings. The previously combined current/previous-month card is now a separate last-month card beneath that section. Every last-month card on the dashboard has a matching current-month card above it; the affected pages are Summary and Invoicing + chargeback. Combined current/previous-month charts remain intact.
+
+The new current-month sections always use UTC charge dates from the first day of the current month through the current time, independent of Charge period, Custom charge dates and trend controls. Currency still applies, and totals keep currencies separate. The existing Invoicing last-month cards preserve their original billing-month basis; adjustments whose charge and billing months differ can therefore appear differently in these two sections. Summary's last-month card retains its charge-month basis. Selected-period costs and trends continue to use the chosen charge-date range. New fixed cost/count cards are eight rows high to avoid Fabric's minimum-size rendering errors.
+
+Fixed anomaly-history charts, forecasts and ingestion-inventory diagnostics also retain their existing periods. Tile descriptions identify which views follow the selector. All monthly cards reflect imported exports, which can lag billing.
+
+Costs reflect the exports already ingested into Fabric, not a live billing estimate. Month-to-date can be incomplete until the latest daily export has loaded; no matching cost records is not evidence of no spend. These controls are included in the dashboard imported by deployment; no Azure networking or export-schedule changes are needed. The Fabric-native calendar control is not a copy of Power BI's slicer.
+
 ### Subscription costs by tag
 
 Open **Subscription costs by tag** in the Fabric dashboard. The page has these filters:
 
 | Filter | Behavior |
 |---|---|
-| Tag cost period | Charge-period start dates in the selected range, start inclusive and end exclusive; defaults to the last 30 days. This page does not use the monthly/daily trend or group-count controls. |
+| Charge period / Custom charge dates | Uses the global charge-date range, defaulting to month-to-date. Choose Custom date range for calendar dates. This page does not use the monthly/daily trend or group-count controls. |
 | Currency | Uses the existing dashboard currency filter. If all currencies are selected, costs remain separate by currency; no conversion or cross-currency total is performed. |
 | Tag source | **Resource/cost tags**, **Subscription tags**, or **Both**. Both displays the sources separately rather than merging or inheriting tags. |
 | Subscriptions | Multi-select by subscription name and unique ID. Includes enabled subscriptions in the inventory, including those without exported cost records, and subscriptions found in the period's cost data. |
@@ -664,7 +687,7 @@ python -m unittest discover -s tests -p 'test_*.py'
 dotnet run --project ./tests/KqlValidation/KqlValidation.csproj -- (Get-Location).Path
 ```
 
-The KQL check analyzes all four functions, ten dashboard queries, and the resource-attribution assertions against typed fixtures; it does not execute queries. An optional second argument writes a self-contained synthetic query containing `tests/resource_cost_assertions.kql` for read-only execution in a Kusto engine. Its `Passed` results verify multi-tag matching, exact pairs, current/no-cost resources, missing resource IDs, historical resources, case-normalized IDs, currency separation and cost reconciliation. Verify the imported page with your actual Fabric data before relying on it for reporting.
+The KQL check analyzes all four functions, the tag and date-range dashboard queries, and the resource-attribution/date-boundary assertions against typed fixtures; it does not execute queries. An optional second argument writes a self-contained synthetic query containing `tests/resource_cost_assertions.kql` for read-only execution in a Kusto engine. Its `Passed` results verify multi-tag matching, exact pairs, current/no-cost resources, missing resource IDs, historical resources, case-normalized IDs, currency separation and cost reconciliation. Verify the imported page with your actual Fabric data before relying on it for reporting.
 
 ## Credits, support and license
 
