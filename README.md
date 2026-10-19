@@ -156,7 +156,7 @@ The script runs ten steps. All of them are idempotent: running the script again 
 | Step | What happens |
 |---|---|
 | 1. Pre-flight checks | Verifies the Azure CLI sign-in, Microsoft Fabric API access, the required files, the virtual network and subnet, the region, the Fabric SKU, quota and capacity name, the private DNS plan, the resource providers and every permission it needs. Nothing is created until all checks pass. |
-| 2. Fabric capacity | Creates the capacity in the hub region, or reuses, resumes or resizes an existing one. |
+| 2. Network and Fabric capacity | With `-CreateVirtualNetwork`, creates/verifies the new network and subnet after pre-flight/confirmation. Creates the capacity in the hub region, or reuses, resumes or resizes an existing one. |
 | 3. Fabric workspace | Creates the workspace with a workspace identity, the eventhouse and the Ingestion and Hub databases, and runs the FinOps toolkit setup scripts in both databases. |
 | 4. FinOps hub | Deploys `template.json` with private access, connected to the eventhouse. |
 | 5. Private endpoints | Creates the private endpoints in your subnet and registers them in private DNS. |
@@ -207,6 +207,7 @@ The script runs ten steps. All of them are idempotent: running the script again 
 | Hub resource group (or its subscription, if the group doesn't exist yet) | Owner, or Contributor plus User Access Administrator | Deploy the hub and assign roles to its managed identities |
 | Hub subscription | Contributor or Owner, unless the resource providers are already registered | Register the Storage, DataFactory, EventGrid, ManagedIdentity, Network, ContainerInstance, KeyVault, CostManagementExports and Fabric providers |
 | Virtual network and the private endpoint resource group | Network Contributor | Place the private endpoints in your subnet |
+| New network resource group/subscription, with `-CreateVirtualNetwork` | Network Contributor or equivalent; permission to create resource groups at subscription scope if the network RG is missing | Create the new VNet/subnet and, when necessary, its separate resource group |
 | Private DNS zone resource group | Private DNS Zone Contributor (plus Network Contributor on the virtual network to link zones) | Create or link zones and register the records |
 | Every subscription to export | Cost Management Contributor, or higher | Create the exports |
 | Every subscription in the inventory snapshots | Subscription-wide Reader | Read subscription tags and list current ARM resources; a collection failure is reported explicitly and preserves previous snapshots |
@@ -225,8 +226,8 @@ The pre-flight step tests deployment permissions and stops before deploying when
 
 | Requirement | Notes |
 |---|---|
-| An existing virtual network | In any subscription of the tenant. The hub can be in another region, because private endpoints work across regions. |
-| A subnet for the private endpoints | No delegation and at least 8 free IP addresses (about 5 are used). A /28 is enough. |
+| Virtual network | An existing VNet in any subscription of the tenant, **or use `-CreateVirtualNetwork`** to create one in the hub region. Existing VNets can be in another region, because private endpoints work across regions. |
+| A subnet for the private endpoints | No delegation and at least 8 free IP addresses (about 5 are used). A /28 is enough. `-CreateVirtualNetwork` creates this subnet along with the VNet. |
 | A private DNS decision | Reuse existing `privatelink` zones (for example in a central connectivity subscription), let the script create them, or skip DNS when Azure Policy or a DNS team manages the records. The zones are `privatelink.blob.core.windows.net`, `privatelink.dfs.core.windows.net`, `privatelink.datafactory.azure.net` and `privatelink.adf.azure.com`, plus `privatelink.vaultcore.azure.net` when the hub has a Key Vault. |
 | Custom DNS servers | If the virtual network uses custom DNS servers, they must resolve the `privatelink` zones, for example by forwarding to Azure DNS (168.63.129.16) or through Azure DNS Private Resolver. The pre-flight step warns you when custom DNS servers are configured. |
 | Hub internal network | The hub creates its own small isolated network (default `10.20.30.0/26`). Use `-HubVirtualNetworkAddressPrefix` to pick another range if it overlaps networks you may peer later. |
@@ -234,11 +235,34 @@ The pre-flight step tests deployment permissions and stops before deploying when
 ### Checklist
 
 - [ ] PowerShell 7.2+ and Azure CLI 2.60+ are installed
-- [ ] You know which subscription, virtual network and subnet to use
+- [ ] You know which subscription and existing network/subnet to use, or choose `-CreateVirtualNetwork` and suitable address ranges
 - [ ] You know where the private DNS zones live, or that DNS is managed centrally
 - [ ] Someone has signed in to Microsoft Fabric in this tenant, and there is Fabric quota in the region
 - [ ] You have the permissions listed above
 - [ ] Optional: you have the object ID of the Entra ID group that should see the dashboard
+
+### Create a new network automatically
+
+Use **`-CreateVirtualNetwork`** for a new private-endpoint network without deploying a VNet, subnet or network resource group beforehand:
+
+```powershell
+.\Deploy-FinOpsHub-V3-Fabric.ps1 `
+    -SubscriptionId '00000000-0000-0000-0000-000000000000' `
+    -ResourceGroupName 'rg-finops-private' `
+    -Location 'centralus' `
+    -FabricCapacitySku F2 `
+    -FabricWorkspaceName 'FinOps hub - private test' `
+    -CreateVirtualNetwork `
+    -UseKeylessRuntime
+```
+
+Replace the example subscription ID. With that resource group name, the defaults are **`rg-finops-private-network`**, **`vnet-rg-finops-private`** with **`10.30.0.0/24`**, and **`snet-private-endpoints`** with **`10.30.0.0/28`**. The network subscription defaults to the hub subscription, and the network region is the hub region. The script also creates/links private DNS zones in the network resource group by default. You can override the existing name/subscription parameters and the new **`VirtualNetworkAddressPrefix`** and **`PrivateEndpointSubnetAddressPrefix`** parameters, or select an existing central DNS resource group. A custom DNS resource group outside the new network group must already exist.
+
+The address ranges must be network-aligned IPv4 CIDRs; the subnet must fit inside the VNet and provide at least eight usable IP addresses. The new VNet cannot overlap the hub internal network (`10.20.30.0/26` by default). Choose ranges appropriate to your organization's address plan: the script cannot establish that they are free across your entire estate.
+
+Pre-flight checks and any guided confirmation happen before network creation. Creating a missing network resource group requires subscription-level `Microsoft.Resources/subscriptions/resourceGroups/write`; creating the network/subnet also requires Network Contributor or equivalent permissions at the network resource group/subscription. On reruns, a successfully provisioned VNet with the requested region/address space and a compatible subnet is reused **without modifying its configuration, tags or other subnets**. Conflicting settings or a missing subnet in an existing VNet fail explicitly rather than replacing or expanding that network. The deployment summary records the VNet/subnet IDs and whether the VNet was created.
+
+This switch cannot be combined with `-UsePublicNetworking`. Without it, the existing-network workflow is unchanged. It does **not** create VPN, ExpressRoute, peering, Bastion, a custom DNS forwarder or Fabric Private Link; accessing the private endpoints still requires network connectivity. The [Fabric ingestion storage-firewall limitation](#security-and-networking) is unchanged. For an isolated new report, use a new hub resource group and workspace, and do not use `-SkipHubDeployment` or `-SkipExports` on the initial deployment.
 
 ## Step-by-step deployment
 
@@ -538,13 +562,27 @@ Every run writes a transcript (`logs/Deploy-FinOpsHub-V3-Fabric-<timestamp>.log`
 | Component | How it is configured |
 |---|---|
 | Data Factory | Public network access is disabled. It is reached through private endpoints in your virtual network (Data Factory and Data Factory Studio), and its managed runtime reaches storage through managed private endpoints. |
-| Storage account (Data Lake) | Private endpoints for blob and dfs in your virtual network. Every request needs Microsoft Entra ID (role-based access) or the account key, and anonymous access stays disabled. The firewall allows Fabric to load the data (see the note below). |
+| Storage account (Data Lake) | Private endpoints for blob and dfs in your virtual network. With `-UseKeylessRuntime`, shared-key access is disabled and requests require Entra ID (including supported user-delegation SAS). Anonymous access stays disabled. The firewall allows Fabric to load the data (see the note below). |
 | Key Vault | Private endpoint, when the hub template deploys one |
 | Microsoft Fabric | A SaaS service protected by Microsoft Entra ID and workspace roles. The workspace identity has a resource instance rule on the storage account. Fabric private links are not configured by this script. |
 | Identities | In Fabric, the Data Factory managed identity is admin of the Ingestion and Hub databases (not of the workspace), and the workspace identity is Contributor on its own workspace. People get Viewer on the workspace. The account that runs the script becomes a Fabric capacity administrator. |
 | Tags | `-Tags` applies your tags to the resource groups and every resource, including the Fabric capacity. |
 
 **About the storage firewall.** Fabric eventhouses load data by pulling the files from storage. Today, neither the trusted Azure services exception, trusted workspace access, nor Fabric managed private endpoints cover that path. This is [FinOps toolkit issue #2061](https://github.com/microsoft/finops-toolkit/issues/2061), and it was also confirmed while this utility was tested. The script therefore sets the hub storage firewall to allow all networks, while every request still needs Entra ID or key authentication. If your policy doesn't allow that, use `-KeepStorageFirewallClosed`. The rest of the deployment still works, but the cost data stays in storage and does not reach Fabric until the limitation is lifted. The verification step reports the result either way.
+
+### Keyless runtime authentication
+
+Add **`-UseKeylessRuntime`** to your normal deployment command to use Microsoft Entra ID instead of storage account keys. It also works with **`-SkipHubDeployment -SkipExports`** for an existing deployment whose connections and exports already use managed identities. This is an explicit opt-in; omitting it preserves the upstream authentication settings, and a later full template deployment without it can re-enable hub storage keys.
+
+The dashboard already uses Entra sign-in and Fabric workspace roles. Data Factory uses its system-assigned managed identity for Data Lake access and Entra-authenticated `;impersonate` ingestion into Fabric. This mode checks those paths, grants Data Factory **Storage Blob Data Contributor** on hub storage, checks visible Cost Management exports targeting that account, and ensures their identities have **Storage Blob Data Contributor** on their destination containers. It then sets **`allowSharedKeyAccess=false`**, verifies the persisted setting, and records the result in the deployment summary. Authentication changes do not close the storage firewall or replace the Data Factory identity with the Fabric workspace identity. Foundry is not needed.
+
+For a full deployment, the script changes only hub Data Lake definitions in the submitted template to disallow shared-key access; the upstream `template.json` on disk is unchanged. Existing connections and visible export identities are checked during pre-flight before that template is submitted. Unsupported account-key/SAS/service-principal storage connections, unverified external storage targets, missing export identities, and optional `remoteHubStorageUri`/`remoteHubStorageKey` configurations block this mode explicitly. For legacy exports created by this script without identities, first run without `-UseKeylessRuntime` and without `-SkipExports` to update them, then enable keyless mode.
+
+**Audit other storage consumers before enabling it.** Account-key callers and account/service SAS tokens will stop working. Migrate Power BI connections, custom scripts, and other applications to Entra authentication first. Export discovery covers enabled subscriptions visible to the deployment identity plus explicit `-ExportScopes`; include any billing or other export scopes targeting the hub. It cannot discover clients outside that scope. Configuration/read-back checks are not proof of a successful live export or ingestion; check export run history and Fabric data loads after deployment.
+
+**Deployment-only exception:** ARM deployment scripts still need a storage key to mount their supporting Azure Files share in Azure Container Instances. Those separate supporting accounts retain shared-key access. `-ScriptStorageTags` now applies only to accounts explicitly referenced by deployment-script settings/status in the hub resource group, and refuses Data Lake accounts; it no longer opens or enables keys on every account in that group. Watcher errors appear as warnings in the deployment log. If policy blocks an automatically created supporting account before its reference becomes available, arrange a narrowly scoped policy exemption for deployment-script supporting storage; the watcher does not fall back to tagging unrelated accounts. Existing exemption tags are not removed automatically.
+
+See [deployment-script storage requirements](https://learn.microsoft.com/azure/azure-resource-manager/templates/deployment-script-template#use-existing-storage-account), [Cost Management export identities](https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-improved-exports#configure-exports-for-storage-accounts-with-a-firewall), and [preventing Shared Key authorization](https://learn.microsoft.com/azure/storage/common/shared-key-authorization-prevent).
 
 ## Cost
 
@@ -580,10 +618,13 @@ Run `Get-Help ./Deploy-FinOpsHub-V3-Fabric.ps1 -Full` for the complete help. Par
 
 | Parameter | Description | Default |
 |---|---|---|
-| `VirtualNetworkName` | Existing virtual network for the private endpoints | Asked in guided setup |
-| `VirtualNetworkResourceGroupName` | Resource group of the virtual network | Asked in guided setup |
+| `VirtualNetworkName` | Virtual network for the private endpoints; must exist unless `CreateVirtualNetwork` is enabled | Asked for existing networks; derived from the hub RG for new networks |
+| `CreateVirtualNetwork` | Create a dedicated network RG/VNet/subnet after pre-flight; reuse only compatible existing settings without modifying them | off |
+| `VirtualNetworkAddressPrefix` | IPv4 address space for the VNet created with `-CreateVirtualNetwork` | `10.30.0.0/24` |
+| `PrivateEndpointSubnetAddressPrefix` | Contained, network-aligned IPv4 range for the new private-endpoint subnet; /28 or larger | `10.30.0.0/28` |
+| `VirtualNetworkResourceGroupName` | Resource group of the virtual network; created if missing with `CreateVirtualNetwork` | Asked for existing networks; `<hub RG>-network` for new networks |
 | `VirtualNetworkSubscriptionId` | Subscription of the virtual network | `SubscriptionId` |
-| `PrivateEndpointSubnetName` | Existing subnet without delegation; about 5 IP addresses are used | Asked in guided setup |
+| `PrivateEndpointSubnetName` | Subnet without delegation; about 5 IP addresses are used | Asked for existing networks; `snet-private-endpoints` for new networks |
 | `PrivateEndpointResourceGroupName` | Resource group for the private endpoint resources, in the virtual network's subscription | Hub resource group, or the virtual network's resource group when it is in another subscription |
 | `PrivateDnsZoneSubscriptionId` | Subscription that holds your private DNS zones | `VirtualNetworkSubscriptionId` |
 | `PrivateDnsZoneResourceGroupName` | Existing resource group for the private DNS zones. Zones there are reused and linked; missing zones are created there. It can't be the hub resource group. | `VirtualNetworkResourceGroupName` |
@@ -617,6 +658,8 @@ Run `Get-Help ./Deploy-FinOpsHub-V3-Fabric.ps1 -Full` for the complete help. Par
 |---|---|---|
 | `AllowDataFactoryPublicAccess` | Keep Data Factory public network access enabled | off |
 | `UsePublicNetworking` | Deploy with public network access: no virtual network, subnet, private endpoints, private DNS or Data Factory managed network (the VNet/subnet/DNS parameters are ignored and not required) | off |
+| `UseKeylessRuntime` | Disable shared-key authentication on hub Data Lake storage after checking managed-identity dependencies; deployment-script supporting storage retains its key exception | off |
+| `ScriptStorageTags` | Policy exemption tags for explicitly identified deployment-script supporting storage only, not hub Data Lake or unrelated accounts | none |
 | `KeepStorageFirewallClosed` | Keep the hub storage firewall closed. Data then stays in storage and does not reach Fabric (see [Security and networking](#security-and-networking)). | off |
 
 **Run control and files**
@@ -670,7 +713,7 @@ Run `Get-Help ./Deploy-FinOpsHub-V3-Fabric.ps1 -Full` for the complete help. Par
 | `finops-hub-dashboard.json` | FinOps hub dashboard definition, imported into Fabric |
 | `fabric/finops-hub-fabric-setup-Ingestion.kql`, `fabric/finops-hub-fabric-setup-Hub.kql` | Database setup scripts (FinOps toolkit release 14 assets that match `template.json`) |
 | `fabric/finops-hub-subscription-tags.kql` | Supplemental subscription inventory table and tag cost functions |
-| `tests/` | Offline PowerShell snapshot tests and typed Kusto query validation |
+| `tests/` | Offline PowerShell inventory/authentication tests and typed Kusto query validation |
 | `modules/private-endpoints.bicep`, `modules/private-dns-zones.bicep` | Bicep source of the private endpoint and private DNS templates |
 | `modules/private-endpoints.json`, `modules/private-dns-zones.json` | The compiled ARM templates that the script deploys |
 | `examples/customer-fabric.psd1` | Sample parameters for unattended runs |
@@ -682,7 +725,7 @@ Run `Get-Help ./Deploy-FinOpsHub-V3-Fabric.ps1 -Full` for the complete help. Par
 These checks do not sign in, deploy resources or write to Azure/Fabric. PowerShell tests require Pester 5; KQL analysis requires the .NET 8 SDK or later and restores the pinned Kusto language package.
 
 ```powershell
-Invoke-Pester ./tests/SubscriptionTags.Tests.ps1
+Invoke-Pester -Path @('./tests/SubscriptionTags.Tests.ps1', './tests/RuntimeAuthentication.Tests.ps1', './tests/PrivateNetwork.Tests.ps1')
 python -m unittest discover -s tests -p 'test_*.py'
 dotnet run --project ./tests/KqlValidation/KqlValidation.csproj -- (Get-Location).Path
 ```

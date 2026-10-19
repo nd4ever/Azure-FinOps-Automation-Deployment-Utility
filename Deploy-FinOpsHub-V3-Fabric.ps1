@@ -67,20 +67,41 @@
     consider restricting the storage account and Data Factory by IP address after deployment.
 
 .PARAMETER ScriptStorageTags
-    Tags (hashtable) to put on every storage account that appears in the hub resource group during the template
-    deployment, including the one the deployment-script service creates itself. Key-based access is enabled and the
-    firewall opened (public access Enabled, default action Allow) on each account, because deployment scripts need both. Use it when a policy turns off shared key access unless an exemption tag is present, for example
+    Tags (hashtable) for storage accounts explicitly referenced by deployment scripts in the hub resource group.
+    Key-based access is enabled and the firewall opened on those supporting accounts only, never on the hub's
+    Data Lake account or unrelated accounts. Use it when a policy turns off shared key access unless an exemption tag is present, for example
     -ScriptStorageTags @{ Security = 'Exception'; SecurityControl = 'Ignore' }. Deployment scripts need key access.
 
+.PARAMETER UseKeylessRuntime
+    Disable shared-key access on the hub Data Lake account, using Data Factory and export managed identities.
+    Validate storage linked services and export identities before disabling keys. Account-key remote-hub connections
+    are not supported in this mode. Deployment-script supporting storage retains its required key exception.
+    Other consumers of the hub storage must already use Entra ID; account-key and service/account SAS callers will fail.
+
 .PARAMETER VirtualNetworkName
-    Existing virtual network that will host the private endpoints. Prompted with a list when omitted.
+    Virtual network that will host the private endpoints. Without -CreateVirtualNetwork it must exist.
+    With -CreateVirtualNetwork, defaults to a name derived from the hub resource group.
 
 .PARAMETER VirtualNetworkResourceGroupName
-    Resource group of the virtual network. Prompted (with the virtual network) when omitted.
+    Resource group of the virtual network. With -CreateVirtualNetwork it is created if missing and defaults to
+    <hub resource group>-network; it must be separate from the hub resource group.
 
 .PARAMETER PrivateEndpointSubnetName
-    Existing subnet (not delegated) for the private endpoints; about 5 IP addresses are used. Prompted with a list
-    when omitted.
+    Non-delegated subnet for the private endpoints; about 5 IP addresses are used. With -CreateVirtualNetwork,
+    defaults to snet-private-endpoints.
+
+.PARAMETER CreateVirtualNetwork
+    Create a dedicated VNet and private-endpoint subnet after pre-flight/confirmation, in the hub region.
+    Reuse a compatible existing network without updating it; fail on conflicting settings. Cannot be combined
+    with -UsePublicNetworking. Does not create VPN, peering, Bastion or Fabric Private Link.
+
+.PARAMETER VirtualNetworkAddressPrefix
+    IPv4 network range for -CreateVirtualNetwork. Default: 10.30.0.0/24. Must contain the private-endpoint
+    subnet and must not overlap the hub's internal network. Ignored when reusing a network without the switch.
+
+.PARAMETER PrivateEndpointSubnetAddressPrefix
+    IPv4 subnet range for -CreateVirtualNetwork. Default: 10.30.0.0/28 (11 usable addresses).
+    Must be a network-aligned CIDR of /28 or larger within VirtualNetworkAddressPrefix.
 
 .PARAMETER VirtualNetworkSubscriptionId
     Subscription of the virtual network. Default: SubscriptionId.
@@ -95,7 +116,8 @@
     Default: VirtualNetworkSubscriptionId.
 
 .PARAMETER PrivateDnsZoneResourceGroupName
-    Existing resource group that holds your private DNS zones. Zones found there are reused and linked to the
+    Resource group that holds your private DNS zones. It must exist unless it is the network group being created
+    with -CreateVirtualNetwork. Zones found there are reused and linked to the
     virtual network; missing zones are created there and linked. Zones the virtual network is already linked to
     are reused wherever they are. Default: VirtualNetworkResourceGroupName. Cannot be the hub resource group.
 
@@ -234,6 +256,9 @@ param(
     [string] $VirtualNetworkName,
     [string] $VirtualNetworkResourceGroupName,
     [string] $PrivateEndpointSubnetName,
+    [switch] $CreateVirtualNetwork,
+    [string] $VirtualNetworkAddressPrefix = '10.30.0.0/24',
+    [string] $PrivateEndpointSubnetAddressPrefix = '10.30.0.0/28',
     [ValidatePattern('^([0-9a-fA-F-]{36})?$')][string] $VirtualNetworkSubscriptionId,
     [string] $PrivateEndpointResourceGroupName,
     [ValidatePattern('^([0-9a-fA-F-]{36})?$')][string] $PrivateDnsZoneSubscriptionId,
@@ -256,6 +281,7 @@ param(
     [ValidateSet('1.2-preview', '1.0r2', '1.0')][string] $FocusDatasetVersion = '1.2-preview',
     [switch] $AllowDataFactoryPublicAccess,
     [switch] $KeepStorageFirewallClosed,
+    [switch] $UseKeylessRuntime,
     [switch] $SkipHubDeployment,
     [switch] $SkipExports,
     [switch] $SkipDashboard,
@@ -598,6 +624,128 @@ function Test-CidrOverlap([string] $A, [string] $B) {
     $rb = & $toRange $B
     return ($ra[0] -le $rb[1]) -and ($rb[0] -le $ra[1])
 }
+
+    function Get-Ipv4CidrRange([string] $Cidr) {
+        if ($Cidr -notmatch '^(\d{1,3}(?:\.\d{1,3}){3})/(\d{1,2})$') { throw "'$Cidr' must be an IPv4 CIDR." }
+        $address = $Matches[1]
+        $prefix = [int]$Matches[2]
+        $ip = $null
+        if ($prefix -gt 32 -or -not [System.Net.IPAddress]::TryParse($address, [ref]$ip) -or
+            $ip.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork -or $ip.ToString() -ne $address) {
+            throw "'$Cidr' must be a valid canonical IPv4 CIDR."
+        }
+        $bytes = $ip.GetAddressBytes()
+        $number = [double]$bytes[0] * 16777216 + [double]$bytes[1] * 65536 + [double]$bytes[2] * 256 + [double]$bytes[3]
+        $size = [Math]::Pow(2, 32 - $prefix)
+        $start = [Math]::Floor($number / $size) * $size
+        if ($number -ne $start) { throw "'$Cidr' has host bits set; use the network address." }
+        return [pscustomobject]@{ Start = $start; End = $start + $size - 1; Prefix = $prefix; FreeAddresses = $size - 5 }
+    }
+
+    function Get-NewVirtualNetworkSettings([string] $HubGroup, [string] $NetworkName, [string] $NetworkGroup, [string] $SubnetName) {
+        if (-not $NetworkGroup) { $NetworkGroup = $HubGroup.Substring(0, [Math]::Min(82, $HubGroup.Length)) + '-network' }
+        if (-not $NetworkName) {
+            $base = ([regex]::Replace($HubGroup.ToLowerInvariant(), '[^a-z0-9_.-]', '-')).Trim([char[]]'-._')
+            if (-not $base) { $base = 'finops' }
+            $NetworkName = ('vnet-' + $base.Substring(0, [Math]::Min(59, $base.Length))).TrimEnd([char[]]'-.')
+        }
+        if (-not $SubnetName) { $SubnetName = 'snet-private-endpoints' }
+        if ($NetworkGroup -notmatch '^[-\w.\(\)]{1,90}$' -or $NetworkGroup.EndsWith('.') -or $NetworkGroup -ieq $HubGroup) {
+            throw 'The new network resource group must be a valid name and separate from the hub resource group.'
+        }
+        if ($NetworkName -notmatch '^(?=.{1,64}$)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9_])?$') { throw 'Invalid new virtual network name (1-64 characters).' }
+        if ($SubnetName -notmatch '^(?=.{1,80}$)[a-zA-Z0-9](?:[a-zA-Z0-9_.-]*[a-zA-Z0-9_])?$' -or
+            $SubnetName -in 'GatewaySubnet', 'AzureFirewallSubnet', 'AzureFirewallManagementSubnet', 'AzureBastionSubnet', 'RouteServerSubnet') {
+            throw 'Use a valid, non-reserved private-endpoint subnet name (1-80 characters).'
+        }
+        return [pscustomobject]@{ VirtualNetworkName = $NetworkName; VirtualNetworkResourceGroupName = $NetworkGroup; PrivateEndpointSubnetName = $SubnetName }
+    }
+
+    function Assert-NewVirtualNetworkCompatible($VirtualNetwork, [string] $RegionName, [string] $AddressPrefix, [string] $SubnetName, [string] $SubnetPrefix) {
+        $prefixes = @(Get-Value $VirtualNetwork 'properties.addressSpace.addressPrefixes' @())
+        if (([string](Get-Value $VirtualNetwork 'location' '')).ToLowerInvariant().Replace(' ', '') -ne $RegionName -or
+            $prefixes.Count -ne 1 -or $prefixes[0] -ne $AddressPrefix) {
+            throw 'Existing VNet region/address space conflicts with -CreateVirtualNetwork settings. Use another name or matching settings; the VNet was not modified.'
+        }
+        if ((Get-Value $VirtualNetwork 'properties.provisioningState' '') -ne 'Succeeded') {
+            throw 'The existing VNet has not provisioned successfully. Wait for provisioning or resolve its failure before re-running.'
+        }
+        $subnets = @(Get-Value $VirtualNetwork 'properties.subnets' @() | Where-Object { $_.name -ieq $SubnetName })
+        if ($subnets.Count -ne 1) { throw "Existing VNet does not contain subnet '$SubnetName'; no subnets were added or replaced." }
+        $subnet = $subnets[0]
+        $actualPrefix = [string](Get-Value $subnet 'properties.addressPrefix' '')
+        if (-not $actualPrefix) {
+            $subnetPrefixes = @(Get-Value $subnet 'properties.addressPrefixes' @())
+            if ($subnetPrefixes.Count -eq 1) { $actualPrefix = [string]$subnetPrefixes[0] }
+        }
+        $capacity = (Get-Ipv4CidrRange $SubnetPrefix).FreeAddresses
+        if ($actualPrefix -ne $SubnetPrefix -or @(Get-Value $subnet 'properties.delegations' @()).Count -gt 0 -or $capacity -lt 8) {
+            throw 'Existing private-endpoint subnet has conflicting addressing, delegation or insufficient configured capacity; it was not modified.'
+        }
+        return $subnet
+    }
+
+    function Get-NewVirtualNetworkPlan([string] $Subscription, [string] $Group, [string] $Name, [string] $RegionName,
+        [string] $AddressPrefix, [string] $SubnetName, [string] $SubnetPrefix, [string] $HubPrefix) {
+        $networkRange = Get-Ipv4CidrRange $AddressPrefix
+        $subnetRange = Get-Ipv4CidrRange $SubnetPrefix
+        $null = Get-Ipv4CidrRange $HubPrefix
+        if ($subnetRange.FreeAddresses -lt 8 -or $subnetRange.Start -lt $networkRange.Start -or $subnetRange.End -gt $networkRange.End) {
+            throw 'The private-endpoint subnet must have at least 8 usable addresses (/28 or larger) and be contained in the new VNet range.'
+        }
+        if (Test-CidrOverlap $AddressPrefix $HubPrefix) { throw 'The new VNet range overlaps the hub internal network. Change VirtualNetworkAddressPrefix or HubVirtualNetworkAddressPrefix.' }
+        $id = "/subscriptions/$Subscription/resourceGroups/$Group/providers/Microsoft.Network/virtualNetworks/$Name"
+        $existing = Invoke-Arm -Path "$id`?api-version=2024-05-01" -AllowNotFound
+        if ($existing) {
+            $subnet = Assert-NewVirtualNetworkCompatible -VirtualNetwork $existing.Content -RegionName $RegionName -AddressPrefix $AddressPrefix -SubnetName $SubnetName -SubnetPrefix $SubnetPrefix
+            $vnet = $existing.Content
+        }
+        else {
+            $subnet = [pscustomobject]@{
+                id = "$id/subnets/$SubnetName"; name = $SubnetName
+                properties = @{ addressPrefix = $SubnetPrefix; privateEndpointNetworkPolicies = 'Disabled'; delegations = @() }
+            }
+            $vnet = [pscustomobject]@{
+                id = $id; name = $Name; location = $RegionName
+                properties = @{ addressSpace = @{ addressPrefixes = @($AddressPrefix) }; subnets = @($subnet) }
+            }
+        }
+        return [pscustomobject]@{
+            Subscription = $Subscription; ResourceGroup = $Group; VirtualNetwork = $vnet; Subnet = $subnet
+            AddressPrefix = $AddressPrefix; SubnetPrefix = $SubnetPrefix; Existing = [bool]$existing
+        }
+    }
+
+    function Set-NewVirtualNetwork($Plan, [hashtable] $ResourceTags) {
+        $path = "$($Plan.VirtualNetwork.id)?api-version=2024-05-01"
+        $current = Invoke-Arm -Path $path -AllowNotFound
+        if ($current) {
+            $subnet = Assert-NewVirtualNetworkCompatible -VirtualNetwork $current.Content -RegionName $Plan.VirtualNetwork.location -AddressPrefix $Plan.AddressPrefix -SubnetName $Plan.Subnet.name -SubnetPrefix $Plan.SubnetPrefix
+            return [pscustomobject]@{ VirtualNetwork = $current.Content; Subnet = $subnet; Created = $false }
+        }
+        if ($Plan.Existing) { throw 'The VNet disappeared after pre-flight; refusing to recreate it automatically. Re-run to build a fresh plan.' }
+        Set-ResourceGroup -Subscription $Plan.Subscription -Name $Plan.ResourceGroup -RegionName $Plan.VirtualNetwork.location -ResourceTags $ResourceTags | Out-Null
+        $body = @{
+            location = $Plan.VirtualNetwork.location; tags = $ResourceTags
+            properties = @{
+                addressSpace = @{ addressPrefixes = @($Plan.AddressPrefix) }
+                subnets = @(@{ name = $Plan.Subnet.name; properties = @{ addressPrefix = $Plan.SubnetPrefix; privateEndpointNetworkPolicies = 'Disabled' } })
+            }
+        }
+        $response = Invoke-Arm -Method PUT -Path $path -Body $body -OkStatus 200, 201, 202
+        Wait-ArmAsyncOperation -Response $response -TimeoutMinutes 15
+        $deadline = (Get-Date).AddMinutes(15)
+        do {
+            $current = Invoke-Arm -Path $path -AllowNotFound
+            $state = [string](Get-Value $current 'Content.properties.provisioningState' '')
+            if ($state -in 'Failed', 'Canceled') { throw "New VNet provisioning ended with '$state'." }
+            if ($state -eq 'Succeeded') { break }
+            if ((Get-Date) -ge $deadline) { throw 'Timed out waiting for the new VNet to provision.' }
+            Start-Sleep -Seconds 5
+        } while ($true)
+        $subnet = Assert-NewVirtualNetworkCompatible -VirtualNetwork $current.Content -RegionName $Plan.VirtualNetwork.location -AddressPrefix $Plan.AddressPrefix -SubnetName $Plan.Subnet.name -SubnetPrefix $Plan.SubnetPrefix
+        return [pscustomobject]@{ VirtualNetwork = $current.Content; Subnet = $subnet; Created = $true }
+    }
 #endregion
 
 #region Azure helpers
@@ -1248,6 +1396,153 @@ function Set-FabricStorageAccess($Hub, [string] $WorkspaceId, [switch] $KeepFire
     return [pscustomobject]@{ RuleId = $ruleId; DefaultAction = $defaultAction; Changed = $true }
 }
 
+function Assert-KeylessTemplateParameters([System.Collections.IDictionary] $Values) {
+    if ((Get-Value $Values 'remoteHubStorageKey' '') -or (Get-Value $Values 'remoteHubStorageUri' '')) {
+        throw '-UseKeylessRuntime does not support the optional account-key remote-hub module. Migrate that connection separately before enabling this mode.'
+    }
+}
+
+function ConvertTo-KeylessHubTemplate([string] $TemplateJson) {
+    $template = $TemplateJson | ConvertFrom-Json -AsHashtable -Depth 100
+    $state = @{ Count = 0 }
+    function Update-HubStorage($Node) {
+        if ($Node -is [System.Collections.IDictionary]) {
+            if ((Get-Value $Node 'type' '') -ieq 'Microsoft.Storage/storageAccounts' -and
+                (Get-Value $Node 'name' '') -eq "[parameters('app').storage]" -and
+                (Get-Value $Node 'existing' $false) -ne $true) {
+                $properties = Get-Value $Node 'properties'
+                if ($properties -isnot [string] -or -not $properties.Contains("'allowSharedKeyAccess', true()")) {
+                    throw 'Unrecognized hub storage definition in TemplateFile; cannot safely apply keyless runtime settings.'
+                }
+                $Node['properties'] = $properties.Replace("'allowSharedKeyAccess', true()", "'allowSharedKeyAccess', false()")
+                $state.Count++
+            }
+            foreach ($value in $Node.Values) { Update-HubStorage $value }
+        }
+        elseif ($Node -is [array]) { foreach ($value in $Node) { Update-HubStorage $value } }
+    }
+    Update-HubStorage $template
+    if ($state.Count -eq 0) { throw 'No recognized hub storage definitions in TemplateFile; cannot apply keyless runtime settings.' }
+    return ($template | ConvertTo-Json -Depth 100 -Compress)
+}
+
+function Assert-KeylessExistingHub([System.Collections.IDictionary] $TemplateValues) {
+    $previous = @(Get-ArmList "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Resources/deployments?api-version=2024-03-01" |
+        Where-Object { $_.name -like "$script:DeploymentPrefix-*" -and (Get-Value $_ 'properties.provisioningState' '') -eq 'Succeeded' } |
+        Sort-Object { [DateTime](Get-Value $_ 'properties.timestamp') } -Descending)
+    if ($previous.Count -eq 0) { return }
+    $hub = Get-HubResourceIds -Outputs (Get-Value $previous[0] 'properties.outputs') -TemplateValues ([hashtable]$TemplateValues)
+    if (-not $hub.StorageId) { throw 'The previous hub deployment has no storage output; cannot safely validate existing keyless dependencies.' }
+    $null = Assert-KeylessStorageLinkedServices -Hub $hub
+    Assert-KeylessFabricIngestion -Hub $hub
+    $scopes = @(@(Get-DefaultExportScopes) + @($ExportScopes) | Where-Object { $_ } | Sort-Object -Unique)
+    $null = @(Get-KeylessHubExports -Hub $hub -Scopes $scopes)
+}
+
+function Assert-KeylessStorageLinkedServices($Hub) {
+    $services = @(Get-ArmList "$($Hub.DataFactoryId)/linkedservices?api-version=2018-06-01")
+    $storageServices = @($services | Where-Object { (Get-Value $_ 'properties.type' '') -in 'AzureBlobFS', 'AzureBlobStorage' })
+    $hubService = $false
+    foreach ($service in $storageServices) {
+        $properties = Get-Value $service 'properties'
+        $typeProperties = Get-Value $properties 'typeProperties'
+        foreach ($key in @('accountKey', 'sasUri', 'sasToken', 'connectionString', 'servicePrincipalId', 'servicePrincipalKey', 'servicePrincipalCredential', 'credential')) {
+            if ($null -ne (Get-Value $typeProperties $key)) {
+                throw "Storage linked service '$($service.name)' uses '$key', not the Data Factory system-assigned identity. Migrate it before enabling -UseKeylessRuntime; no storage keys were disabled."
+            }
+        }
+        if (Get-Value $properties 'credential') {
+            throw "Storage linked service '$($service.name)' uses a separate credential. Migrate it to the Data Factory system-assigned identity before enabling -UseKeylessRuntime."
+        }
+        $authentication = [string](Get-Value $typeProperties 'authenticationType' '')
+        if ($authentication -and $authentication -notin 'ManagedIdentity', 'ManagedServiceIdentity') {
+            throw "Storage linked service '$($service.name)' uses unsupported authentication '$authentication'; no storage keys were disabled."
+        }
+        $url = [string](Get-Value $typeProperties 'url' '')
+        $uri = $null
+        if (-not [Uri]::TryCreate($url, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https') {
+            throw "Storage linked service '$($service.name)' has a dynamic or invalid URL; keyless storage access cannot be verified."
+        }
+        if ($uri.Host -ieq "$($Hub.StorageName).dfs.core.windows.net" -or $uri.Host -ieq "$($Hub.StorageName).blob.core.windows.net") { $hubService = $true }
+        else {
+            throw "Storage linked service '$($service.name)' targets another account. Verify its identity permissions separately before enabling -UseKeylessRuntime."
+        }
+    }
+    if (-not $hubService) { throw 'No managed-identity hub storage linked service was found; no storage keys were disabled.' }
+    return $storageServices.Count
+}
+
+function Assert-KeylessFabricIngestion($Hub) {
+    $pipelines = @(Get-ArmList "$($Hub.DataFactoryId)/pipelines?api-version=2018-06-01")
+    $state = @{ Commands = 0 }
+    function Test-IngestionCommands($Node, [string] $PipelineName) {
+        if ($Node -is [string]) {
+            foreach ($command in [regex]::Matches($Node, '(?s)\.ingest into table.*?(?=\.ingest into table|$)')) {
+                $state.Commands++
+                if ($command.Value -notmatch ';impersonate') {
+                    throw "Pipeline '$PipelineName' does not use the supported Entra-authenticated Fabric ingestion path (;impersonate). Migrate it before enabling -UseKeylessRuntime."
+                }
+            }
+        }
+        elseif ($Node -is [System.Collections.IDictionary]) { foreach ($value in $Node.Values) { Test-IngestionCommands $value $PipelineName } }
+        elseif ($Node -is [array]) { foreach ($value in $Node) { Test-IngestionCommands $value $PipelineName } }
+    }
+    foreach ($pipeline in $pipelines) {
+        $document = $pipeline | ConvertTo-Json -Depth 100 -Compress | ConvertFrom-Json -AsHashtable -Depth 100
+        Test-IngestionCommands $document ([string](Get-Value $pipeline 'name' ''))
+    }
+    if ($state.Commands -eq 0) { throw 'No Fabric ingestion command was found; keyless ingestion cannot be verified.' }
+}
+
+function Set-HubStorageDataRole([string] $StorageId, [string] $PrincipalId, [string] $RoleId) {
+    if (-not $PrincipalId) { throw 'A managed identity principal ID is required for keyless hub storage access.' }
+    $roleDefinitionId = "/subscriptions/$($StorageId.Split('/')[2])/providers/Microsoft.Authorization/roleDefinitions/$RoleId"
+    $assignments = @(Get-ArmList "$StorageId/providers/Microsoft.Authorization/roleAssignments?api-version=2022-04-01")
+    $existing = @($assignments | Where-Object {
+        (Get-Value $_ 'properties.principalId' '') -ieq $PrincipalId -and
+        (Get-Value $_ 'properties.roleDefinitionId' '') -ieq $roleDefinitionId -and
+        (Get-Value $_ 'properties.scope' '') -ieq $StorageId
+    })
+    if ($existing.Count -gt 0) { return }
+    $name = New-DeterministicGuid "$StorageId|$RoleId|$PrincipalId"
+    $body = @{ properties = @{ roleDefinitionId = $roleDefinitionId; principalId = $PrincipalId; principalType = 'ServicePrincipal' } }
+    Invoke-Arm -Method PUT -Path "$StorageId/providers/Microsoft.Authorization/roleAssignments/$name`?api-version=2022-04-01" -Body $body -OkStatus 200, 201 | Out-Null
+}
+
+function Get-KeylessHubExports($Hub, [string[]] $Scopes) {
+    foreach ($scope in $Scopes) {
+        foreach ($export in @(Get-ArmList "$scope/providers/Microsoft.CostManagement/exports?api-version=$script:ExportsApiVersion")) {
+            if ((Get-Value $export 'properties.deliveryInfo.destination.resourceId' '') -ine $Hub.StorageId) { continue }
+            $principalId = [string](Get-Value $export 'identity.principalId' '')
+            if ((Get-Value $export 'identity.type' '') -ne 'SystemAssigned' -or -not $principalId) {
+                throw "Export '$($export.name)' targeting hub storage has no system-assigned identity. Update it with managed identity before enabling -UseKeylessRuntime; for this script's exports, first run without -UseKeylessRuntime and without -SkipExports."
+            }
+            $container = [string](Get-Value $export 'properties.deliveryInfo.destination.container' '')
+            if ($container -notmatch '^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$') { throw "Export '$($export.name)' has an invalid destination container." }
+            [pscustomobject]@{ Id = $export.id; PrincipalId = $principalId; Container = $container }
+        }
+    }
+}
+
+function Set-KeylessHubRuntime($Hub, [string] $FactoryPrincipalId, [string[]] $Scopes) {
+    $services = Assert-KeylessStorageLinkedServices -Hub $Hub
+    Assert-KeylessFabricIngestion -Hub $Hub
+    $exports = @(Get-KeylessHubExports -Hub $Hub -Scopes $Scopes)
+    # Prepare every known dependency before changing the account authentication policy.
+    Set-HubStorageDataRole -StorageId $Hub.StorageId -PrincipalId $FactoryPrincipalId -RoleId 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+    foreach ($export in $exports) {
+        Set-HubStorageDataRole -StorageId "$($Hub.StorageId)/blobServices/default/containers/$($export.Container)" -PrincipalId $export.PrincipalId -RoleId 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+    }
+    $path = "$($Hub.StorageId)?api-version=2023-05-01"
+    $storage = (Invoke-Arm -Path $path).Content
+    if ((Get-Value $storage 'properties.allowSharedKeyAccess') -ne $false) {
+        Invoke-Arm -Method PATCH -Path $path -Body @{ properties = @{ allowSharedKeyAccess = $false } } -RetryOnConflict | Out-Null
+    }
+    $storage = (Invoke-Arm -Path $path).Content
+    if ((Get-Value $storage 'properties.allowSharedKeyAccess') -ne $false) { throw 'Hub storage still permits shared-key access after the update; keyless runtime configuration failed.' }
+    return [pscustomobject]@{ AllowSharedKeyAccess = $false; StorageLinkedServices = $services; Exports = $exports.Count; ExportScopes = $Scopes; FactoryPrincipalId = $FactoryPrincipalId }
+}
+
 function Get-FabricIngestionHealth([string] $QueryUri, [DateTime] $SinceUtc) {
     # Load failures after the storage settings took effect, and the cost rows the Hub database returns.
     $since = $SinceUtc.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
@@ -1404,32 +1699,58 @@ function Get-EffectiveTemplateParameters {
     $mergedTags = @{}
     foreach ($source in @((Get-Value $values 'tags' @{}), $Tags)) { foreach ($key in $source.Keys) { $mergedTags[$key] = $source[$key] } }
     $values['tags'] = $mergedTags
+    if ($UseKeylessRuntime) { Assert-KeylessTemplateParameters -Values $values }
     $prefix = [string](Get-Value $values 'virtualNetworkAddressPrefix' '10.20.30.0/26')
     if ($prefix -notmatch '^\d{1,3}(\.\d{1,3}){3}/(\d|1\d|2[0-6])$') { throw "virtualNetworkAddressPrefix '$prefix' must be a valid CIDR of /26 or larger." }
     return $values
 }
 
+function Get-DeploymentScriptStorageIds([object[]] $Scripts, [string] $Subscription, [string] $Group) {
+    $prefix = "/subscriptions/$Subscription/resourceGroups/$Group/providers/Microsoft.Storage/storageAccounts/"
+    foreach ($deploymentScript in $Scripts) {
+        $id = [string](Get-Value $deploymentScript 'properties.status.storageAccountId' (Get-Value $deploymentScript 'status.storageAccountId' ''))
+        $name = [string](Get-Value $deploymentScript 'properties.storageAccountSettings.storageAccountName' (Get-Value $deploymentScript 'storageAccountSettings.storageAccountName' ''))
+        if ($name -and $name -notmatch '^[a-z0-9]{3,24}$') { throw 'Invalid deployment-script storage account name.' }
+        if (-not $id -and $name) { $id = "$prefix$name" }
+        if (-not $id) { continue }
+        if (-not $id.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or $id.Substring($prefix.Length) -notmatch '^[a-z0-9]{3,24}$') {
+            throw "Deployment-script storage reference is outside the hub resource group: $id"
+        }
+        $id
+    }
+}
+
 function Start-StorageTagWatcher([string] $Subscription, [string] $Group, [hashtable] $Tags) {
-    <# Background job: every few seconds tags storage accounts in the resource group that lack the tags and enables
-       shared key access on them, so deployment scripts can mount their storage before a policy switches keys off. #>
     $tagArgs = @($Tags.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" })
+    $helpers = @(${function:Get-Value}.ToString(), ${function:Get-DeploymentScriptStorageIds}.ToString())
     Start-ThreadJob -ScriptBlock {
-        param($Sub, $Rg, $TagList, $TagKeys)
+        param($Sub, $Rg, $TagList, $Helpers)
+        Set-Item Function:Get-Value ([scriptblock]::Create($Helpers[0]))
+        Set-Item Function:Get-DeploymentScriptStorageIds ([scriptblock]::Create($Helpers[1]))
+        $lastError = ''
         while ($true) {
             try {
-                $accounts = az storage account list --subscription $Sub --resource-group $Rg --query '[].{id:id,name:name,tags:tags}' --output json 2>$null | ConvertFrom-Json
-                foreach ($account in @($accounts)) {
-                    $missing = @($TagKeys | Where-Object { -not $account.tags -or -not $account.tags.PSObject.Properties[$_] })
-                    if ($missing.Count -gt 0) {
-                        az tag update --resource-id $account.id --operation Merge --tags @TagList --output none 2>$null
-                    }
-                    az storage account update --subscription $Sub --resource-group $Rg --name $account.name --allow-shared-key-access true --public-network-access Enabled --default-action Allow --output none 2>$null
+                $text = az deployment-scripts list --subscription $Sub --resource-group $Rg --output json 2>&1
+                if ($LASTEXITCODE -ne 0) { throw "Cannot list deployment scripts: $text" }
+                $scripts = ($text -join "`n") | ConvertFrom-Json
+                foreach ($id in @(Get-DeploymentScriptStorageIds -Scripts $scripts -Subscription $Sub -Group $Rg | Select-Object -Unique)) {
+                    $text = az storage account show --ids $id --output json 2>&1
+                    if ($LASTEXITCODE -ne 0) { throw "Cannot inspect deployment-script storage: $text" }
+                    $account = ($text -join "`n") | ConvertFrom-Json
+                    if ((Get-Value $account 'isHnsEnabled') -ne $false) { throw "Refusing to enable keys on Data Lake or unverified storage: $id" }
+                    $text = az tag update --resource-id $id --operation Merge --tags @TagList --output none 2>&1
+                    if ($LASTEXITCODE -ne 0) { throw "Cannot tag deployment-script storage: $text" }
+                    $text = az storage account update --ids $id --allow-shared-key-access true --public-network-access Enabled --default-action Allow --output none 2>&1
+                    if ($LASTEXITCODE -ne 0) { throw "Cannot configure deployment-script storage: $text" }
                 }
+                $lastError = ''
             }
-            catch { }
+            catch {
+                if ($_.Exception.Message -ne $lastError) { $lastError = $_.Exception.Message; Write-Output "Deployment-script storage watcher: $lastError" }
+            }
             Start-Sleep -Seconds 5
         }
-    } -ArgumentList $Subscription, $Group, $tagArgs, @($Tags.Keys)
+    } -ArgumentList $Subscription, $Group, $tagArgs, $helpers
 }
 
 function Get-HubResourceIds($Outputs, [hashtable] $TemplateValues) {
@@ -1454,7 +1775,7 @@ function Get-HubDnsZoneNames {
     return @('privatelink.blob.core.windows.net', 'privatelink.dfs.core.windows.net', 'privatelink.datafactory.azure.net', 'privatelink.adf.azure.com')
 }
 
-function Get-PrivateDnsZonePlan([string[]] $ZoneNames, [string] $VirtualNetworkId, [string] $DnsSubscription, [string] $DnsResourceGroup) {
+function Get-PrivateDnsZonePlan([string[]] $ZoneNames, [string] $VirtualNetworkId, [string] $DnsSubscription, [string] $DnsResourceGroup, [switch] $DnsResourceGroupMissing) {
     <# Per zone: Reuse the zone already linked to the virtual network (any subscription), else Link the zone that exists
        in the DNS resource group, else Create it there. A virtual network can link only one zone of a given name. #>
     $linked = @{}
@@ -1464,7 +1785,8 @@ function Get-PrivateDnsZonePlan([string[]] $ZoneNames, [string] $VirtualNetworkI
         $linked[$zoneId.Split('/')[-1].ToLowerInvariant()] = $zoneId
     }
     $inGroup = @{}
-    foreach ($zone in @(Get-ArmList "/subscriptions/$DnsSubscription/resourceGroups/$DnsResourceGroup/providers/Microsoft.Network/privateDnsZones?api-version=2024-06-01")) {
+    $zonesInGroup = if ($DnsResourceGroupMissing) { @() } else { @(Get-ArmList "/subscriptions/$DnsSubscription/resourceGroups/$DnsResourceGroup/providers/Microsoft.Network/privateDnsZones?api-version=2024-06-01") }
+    foreach ($zone in $zonesInGroup) {
         $inGroup[$zone.name.ToLowerInvariant()] = $zone
     }
     $hubRgPrefix = "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/".ToLowerInvariant()
@@ -1877,7 +2199,7 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
     $vnetName = $VirtualNetworkName
     $vnetGroup = $VirtualNetworkResourceGroupName
     $vnetSubscription = $VirtualNetworkSubscriptionId
-    if (-not $UsePublicNetworking) {
+    if (-not $UsePublicNetworking -and -not $CreateVirtualNetwork) {
     if (-not ($vnetName -and $vnetGroup)) {
         $query = "resources | where type =~ 'microsoft.network/virtualnetworks' | where tostring(tags['ftk-tool']) != 'FinOps hubs' | project id, name, subscriptionId, location, prefixes = properties.addressSpace.addressPrefixes"
         $vnets = @(Invoke-ResourceGraph $query | Where-Object {
@@ -1913,7 +2235,7 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
     }
 
     # Public networking has no virtual network to anchor the region; start the region search from a common default.
-    $vnetRegion = if ($UsePublicNetworking) { 'eastus2' } else { ([string]$vnet.location).ToLowerInvariant().Replace(' ', '') }
+    $vnetRegion = if ($UsePublicNetworking -or $CreateVirtualNetwork) { 'eastus2' } else { ([string]$vnet.location).ToLowerInvariant().Replace(' ', '') }
     $hubRegion = $Location.ToLowerInvariant().Replace(' ', '')
     if (-not $hubRegion) {
         # The hub and the Fabric capacity share one region, which must offer Fabric and have capacity quota.
@@ -1961,7 +2283,7 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
                 $suggestion = $candidates[0]
                 Write-Info "Nearest regions with Fabric capacity quota: $($candidates -join ', ')"
             }
-            $regionPrompt = if ($UsePublicNetworking) { 'Azure region for the hub and the Fabric capacity' } else { "Azure region for the hub and the Fabric capacity (the virtual network is in $vnetRegion)" }
+            $regionPrompt = if ($UsePublicNetworking -or $CreateVirtualNetwork) { 'Azure region for the hub and the Fabric capacity (also used for any new VNet)' } else { "Azure region for the hub and the Fabric capacity (the virtual network is in $vnetRegion)" }
             $hubRegion = (Read-Text -Prompt $regionPrompt -Default $suggestion -Validate {
                     param($value)
                     $name = $value.ToLowerInvariant().Replace(' ', '')
@@ -1974,7 +2296,7 @@ function Invoke-GuidedSetup([string] $CurrentSubscriptionId) {
         $answers['Location'] = $hubRegion
     }
 
-    if (-not $SkipPrivateDnsZones -and -not $PrivateDnsZoneResourceGroupName) {
+    if (-not $SkipPrivateDnsZones -and -not $PrivateDnsZoneResourceGroupName -and -not $CreateVirtualNetwork) {
         $needed = @(Get-HubDnsZoneNames)
         $query = "resources | where type =~ 'microsoft.network/privatednszones' and name startswith 'privatelink.' | where tostring(tags['ftk-tool']) != 'FinOps hubs' | project id, name"
         $groups = @(Invoke-ResourceGraph $query | Group-Object { ($_.id -split '/providers/')[0].ToLowerInvariant() } | ForEach-Object {
@@ -2026,6 +2348,7 @@ Start-Transcript -Path (Join-Path $logDirectory "Deploy-FinOpsHub-V3-Fabric-$run
 $overallStart = Get-Date
 try {
     Write-Banner
+    if ($CreateVirtualNetwork -and $UsePublicNetworking) { throw '-CreateVirtualNetwork cannot be combined with -UsePublicNetworking.' }
     if ($UsePublicNetworking) {
         # Public networking: no private DNS, and Data Factory stays reachable (it has no private endpoints).
         $SkipPrivateDnsZones = $true
@@ -2035,7 +2358,7 @@ try {
 
     # --- 1. Pre-flight -------------------------------------------------------------------------------------
     Write-Step 'Pre-flight checks'
-    $required = if ($UsePublicNetworking) { @('SubscriptionId', 'ResourceGroupName') } else { @('SubscriptionId', 'ResourceGroupName', 'VirtualNetworkName', 'VirtualNetworkResourceGroupName', 'PrivateEndpointSubnetName') }
+    $required = if ($UsePublicNetworking -or $CreateVirtualNetwork) { @('SubscriptionId', 'ResourceGroupName') } else { @('SubscriptionId', 'ResourceGroupName', 'VirtualNetworkName', 'VirtualNetworkResourceGroupName', 'PrivateEndpointSubnetName') }
     $missing = @($required | Where-Object { -not (Get-Variable -Name $_ -ValueOnly) })
     $guided = $missing.Count -gt 0
     if ($guided -and -not (Test-CanPrompt)) {
@@ -2083,6 +2406,12 @@ try {
     }
     Write-Ok "Signed in as $($account.user.name) | subscription '$($account.name)' | tenant $($script:TenantId)"
 
+    if ($CreateVirtualNetwork) {
+        $networkSettings = Get-NewVirtualNetworkSettings -HubGroup $ResourceGroupName -NetworkName $VirtualNetworkName -NetworkGroup $VirtualNetworkResourceGroupName -SubnetName $PrivateEndpointSubnetName
+        $VirtualNetworkName = $networkSettings.VirtualNetworkName
+        $VirtualNetworkResourceGroupName = $networkSettings.VirtualNetworkResourceGroupName
+        $PrivateEndpointSubnetName = $networkSettings.PrivateEndpointSubnetName
+    }
     if (-not $VirtualNetworkSubscriptionId) { $VirtualNetworkSubscriptionId = $SubscriptionId }
     if ($PrivateDnsZoneSubscriptionId -and $PrivateDnsZoneSubscriptionId -ne $VirtualNetworkSubscriptionId -and -not $PrivateDnsZoneResourceGroupName) {
         throw 'Pass -PrivateDnsZoneResourceGroupName together with -PrivateDnsZoneSubscriptionId (the existing resource group that holds your private DNS zones).'
@@ -2097,6 +2426,11 @@ try {
     }
 
     $templateValues = Get-EffectiveTemplateParameters
+    if ($UseKeylessRuntime) {
+        $existingGroup = Invoke-Arm -Path "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName`?api-version=2021-04-01" -AllowNotFound
+        if ($existingGroup) { Assert-KeylessExistingHub -TemplateValues $templateValues }
+        Write-Ok 'Keyless runtime mode: existing hub storage connections and visible export identities checked before deployment.'
+    }
     $hubLocation = [string]$templateValues['location']
     $resourceTags = [hashtable]$templateValues['tags']
     $rawRetentionInDays = [int](Get-Value $templateValues 'dataExplorerRawRetentionInDays' 0)
@@ -2177,11 +2511,20 @@ try {
 
     $vnet = $null
     $subnet = $null
+    $networkPlan = $null
+    $networkResult = $null
+    $dnsGroupWillBeCreated = $false
     $dnsPlan = @()
     if ($UsePublicNetworking) { Write-Ok 'Public networking: no virtual network, private endpoints or private DNS will be created' }
     else {
     $vnetPath = "/subscriptions/$VirtualNetworkSubscriptionId/resourceGroups/$VirtualNetworkResourceGroupName/providers/Microsoft.Network/virtualNetworks/$VirtualNetworkName"
-    $vnetResponse = Invoke-Arm -Path "$vnetPath`?api-version=2024-05-01" -AllowNotFound
+    if ($CreateVirtualNetwork) {
+        $networkPlan = Get-NewVirtualNetworkPlan -Subscription $VirtualNetworkSubscriptionId -Group $VirtualNetworkResourceGroupName -Name $VirtualNetworkName -RegionName $hubLocation `
+            -AddressPrefix $VirtualNetworkAddressPrefix -SubnetName $PrivateEndpointSubnetName -SubnetPrefix $PrivateEndpointSubnetAddressPrefix -HubPrefix ([string](Get-Value $templateValues 'virtualNetworkAddressPrefix' '10.20.30.0/26'))
+        $vnetResponse = [pscustomobject]@{ Content = $networkPlan.VirtualNetwork }
+        Write-Info "Network plan: $(if ($networkPlan.Existing) { 'reuse compatible' } else { 'create' }) VNet $VirtualNetworkName in $VirtualNetworkResourceGroupName ($VirtualNetworkAddressPrefix), subnet $PrivateEndpointSubnetName ($PrivateEndpointSubnetAddressPrefix)."
+    }
+    else { $vnetResponse = Invoke-Arm -Path "$vnetPath`?api-version=2024-05-01" -AllowNotFound }
     if (-not $vnetResponse) { throw "Virtual network $VirtualNetworkName was not found in resource group $VirtualNetworkResourceGroupName (subscription $VirtualNetworkSubscriptionId)." }
     $vnet = $vnetResponse.Content
     $subnet = @(Get-Value $vnet 'properties.subnets' @() | Where-Object { $_.name -eq $PrivateEndpointSubnetName })
@@ -2209,9 +2552,12 @@ try {
     if ($SkipPrivateDnsZones) { Write-Info 'Private DNS: not managed (-SkipPrivateDnsZones). Create the records printed at step 5 in your DNS.' }
     else {
         if (-not (Invoke-Arm -Path "/subscriptions/$PrivateDnsZoneSubscriptionId/resourcegroups/$PrivateDnsZoneResourceGroupName`?api-version=2021-04-01" -AllowNotFound)) {
-            throw "Private DNS zone resource group '$PrivateDnsZoneResourceGroupName' was not found in subscription $PrivateDnsZoneSubscriptionId. Create it first, or pass the resource group that holds your private DNS zones."
+            if ($CreateVirtualNetwork -and $PrivateDnsZoneSubscriptionId -eq $VirtualNetworkSubscriptionId -and $PrivateDnsZoneResourceGroupName -ieq $VirtualNetworkResourceGroupName) {
+                $dnsGroupWillBeCreated = $true
+            }
+            else { throw "Private DNS zone resource group '$PrivateDnsZoneResourceGroupName' was not found in subscription $PrivateDnsZoneSubscriptionId. Create it first, or pass the resource group that holds your private DNS zones." }
         }
-        $dnsPlan = @(Get-PrivateDnsZonePlan -ZoneNames (Get-HubDnsZoneNames) -VirtualNetworkId $vnet.id -DnsSubscription $PrivateDnsZoneSubscriptionId -DnsResourceGroup $PrivateDnsZoneResourceGroupName)
+        $dnsPlan = @(Get-PrivateDnsZonePlan -ZoneNames (Get-HubDnsZoneNames) -VirtualNetworkId $vnet.id -DnsSubscription $PrivateDnsZoneSubscriptionId -DnsResourceGroup $PrivateDnsZoneResourceGroupName -DnsResourceGroupMissing:$dnsGroupWillBeCreated)
         Write-Ok ("Private DNS zones: {0} already linked to the virtual network, {1} to link, {2} to create (in {3}, subscription {4})" -f @($dnsPlan | Where-Object Action -eq 'Reuse').Count, @($dnsPlan | Where-Object Action -eq 'Link').Count, @($dnsPlan | Where-Object Action -eq 'Create').Count, $PrivateDnsZoneResourceGroupName, $PrivateDnsZoneSubscriptionId)
         foreach ($zone in $dnsPlan) {
             $parts = $zone.Id.Split('/')
@@ -2234,17 +2580,26 @@ try {
     & $require $hubScope 'Microsoft.Storage/storageAccounts/write' 'set the storage firewall for Fabric ingestion'
     & $require $capacityScope 'Microsoft.Fabric/capacities/write' 'create or update the Fabric capacity'
     if (-not $UsePublicNetworking) {
-        & $require $subnet.id 'Microsoft.Network/virtualNetworks/subnets/join/action' 'place private endpoints in the subnet'
+        $networkGroupExists = if ($CreateVirtualNetwork) { [bool](Invoke-Arm -Path "/subscriptions/$VirtualNetworkSubscriptionId/resourceGroups/$VirtualNetworkResourceGroupName`?api-version=2021-04-01" -AllowNotFound) } else { $true }
+        $networkScope = if ($networkGroupExists) { "/subscriptions/$VirtualNetworkSubscriptionId/resourceGroups/$VirtualNetworkResourceGroupName" } else { "/subscriptions/$VirtualNetworkSubscriptionId" }
+        $networkJoinScope = if ($CreateVirtualNetwork -and -not $networkPlan.Existing) { $networkScope } else { $subnet.id }
+        & $require $networkJoinScope 'Microsoft.Network/virtualNetworks/subnets/join/action' 'place private endpoints in the subnet'
+        if ($CreateVirtualNetwork -and -not $networkPlan.Existing) {
+            & $require $networkScope 'Microsoft.Network/virtualNetworks/write' 'create the new virtual network'
+            & $require $networkScope 'Microsoft.Network/virtualNetworks/subnets/write' 'create the private-endpoint subnet'
+            if (-not $networkGroupExists) { & $require "/subscriptions/$VirtualNetworkSubscriptionId" 'Microsoft.Resources/subscriptions/resourceGroups/write' 'create the network resource group' }
+        }
         & $require $peScope 'Microsoft.Network/privateEndpoints/write' 'create private endpoints'
         & $require $peScope 'Microsoft.Resources/deployments/write' 'deploy the private endpoints'
     }
-    $dnsScope = "/subscriptions/$PrivateDnsZoneSubscriptionId/resourceGroups/$PrivateDnsZoneResourceGroupName"
+    $dnsScope = if ($dnsGroupWillBeCreated) { "/subscriptions/$PrivateDnsZoneSubscriptionId" } else { "/subscriptions/$PrivateDnsZoneSubscriptionId/resourceGroups/$PrivateDnsZoneResourceGroupName" }
     foreach ($zone in $dnsPlan) {
         $zoneScope = if ($zone.Action -eq 'Create') { $dnsScope } else { $zone.Id }
         & $require $zoneScope 'Microsoft.Network/privateDnsZones/join/action' "register DNS records in $($zone.Name)"
         if ($zone.Action -ne 'Reuse') {
             & $require $dnsScope 'Microsoft.Resources/deployments/write' 'deploy private DNS zones and links'
-            & $require $vnet.id 'Microsoft.Network/virtualNetworks/join/action' 'link private DNS zones to the virtual network'
+            $vnetJoinScope = if ($CreateVirtualNetwork -and -not $networkPlan.Existing) { $networkScope } else { $vnet.id }
+            & $require $vnetJoinScope 'Microsoft.Network/virtualNetworks/join/action' 'link private DNS zones to the virtual network'
             & $require $zoneScope 'Microsoft.Network/privateDnsZones/virtualNetworkLinks/write' "link $($zone.Name) to the virtual network"
         }
         if ($zone.Action -eq 'Create') { & $require $dnsScope 'Microsoft.Network/privateDnsZones/write' 'create missing private DNS zones' }
@@ -2265,6 +2620,7 @@ try {
         Write-Info "Fabric workspace:  $FabricWorkspaceName - eventhouse $FabricEventhouseName with the Ingestion and Hub databases, real-time dashboard"
         if ($UsePublicNetworking) { Write-Info 'Networking:        public (no virtual network, private endpoints or private DNS)' }
         else {
+            if ($CreateVirtualNetwork) { Write-Info "Virtual network:   $(if ($networkPlan.Existing) { 'reuse' } else { 'create' }) $VirtualNetworkName ($VirtualNetworkAddressPrefix) in $VirtualNetworkResourceGroupName; subnet $PrivateEndpointSubnetAddressPrefix" }
             Write-Info "Private endpoints: $VirtualNetworkName / $PrivateEndpointSubnetName (endpoint resources in $PrivateEndpointResourceGroupName)"
             $dnsSummary = if ($SkipPrivateDnsZones) { 'not managed by this script' } else {
                 '{0} already linked (reused); {1} to link and {2} to create in {3} (subscription {4})' -f @($dnsPlan | Where-Object Action -eq 'Reuse').Count,
@@ -2284,6 +2640,12 @@ try {
 
     # --- 2. Fabric capacity --------------------------------------------------------------------------------
     Write-Step "Fabric capacity $FabricCapacityName ($FabricCapacitySku)"
+    if ($CreateVirtualNetwork) {
+        $networkResult = Set-NewVirtualNetwork -Plan $networkPlan -ResourceTags $resourceTags
+        $vnet = $networkResult.VirtualNetwork
+        $subnet = $networkResult.Subnet
+        Write-Ok "Virtual network $VirtualNetworkName / $PrivateEndpointSubnetName $(if ($networkResult.Created) { 'created and verified' } else { 'reused without modification' }) in $VirtualNetworkResourceGroupName."
+    }
     Set-ResourceGroup -Subscription $SubscriptionId -Name $ResourceGroupName -RegionName $hubLocation -ResourceTags $resourceTags -MergeTags | Out-Null
     if ($capacityGroup -ne $ResourceGroupName) { Set-ResourceGroup -Subscription $SubscriptionId -Name $capacityGroup -RegionName $hubLocation -ResourceTags $resourceTags -MergeTags | Out-Null }
     $capacity = Set-FabricCapacity -CapacityId $capacityArmId -RegionName $hubLocation -Sku $FabricCapacitySku -Admins $FabricCapacityAdmins -ResourceTags $resourceTags
@@ -2327,23 +2689,32 @@ try {
         if (-not $templateValues['fabricQueryUri']) { throw 'The eventhouse query URI is missing; the template cannot be deployed without it.' }
         Write-Info $(if ($UsePublicNetworking) { 'This takes 10-20 minutes.' } else { 'This takes 20-35 minutes (private networking, deployment scripts).' })
         $templateJson = ConvertTo-Minified (Get-Content -Path $TemplateFile -Raw)
+        if ($UseKeylessRuntime) { $templateJson = ConvertTo-KeylessHubTemplate -TemplateJson $templateJson }
         $tagWatcher = $null
         if ($ScriptStorageTags.Count -gt 0) {
             $tagWatcher = Start-StorageTagWatcher -Subscription $SubscriptionId -Group $ResourceGroupName -Tags $ScriptStorageTags
-            Write-Info "Tagging storage accounts in $ResourceGroupName with $(($ScriptStorageTags.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ') and enabling key access while the template deploys."
+            Write-Info "Tagging only deployment-script supporting storage in $ResourceGroupName and enabling its required key access."
         }
         try {
         $hubDeployment = Invoke-GroupDeployment -Subscription $SubscriptionId -ResourceGroup $ResourceGroupName -NamePrefix $script:DeploymentPrefix `
             -TemplateJson $templateJson -Parameters ([hashtable]$templateValues) -MaxAttempts $MaxDeploymentAttempts -TimeoutMinutes 180 -ShowNestedProgress -ResumeRunning `
             -BeforeAttempt { Clear-HubDeploymentScripts -Subscription $SubscriptionId -ResourceGroup $ResourceGroupName }
         }
-        finally { if ($tagWatcher) { Stop-Job $tagWatcher -ErrorAction SilentlyContinue; Remove-Job $tagWatcher -Force -ErrorAction SilentlyContinue } }
+        finally {
+            if ($tagWatcher) {
+                Stop-Job $tagWatcher
+                Receive-Job $tagWatcher | ForEach-Object { Write-Warn ([string]$_) }
+                if ($tagWatcher.State -eq 'Failed') { Write-Warn "Deployment-script storage watcher failed: $($tagWatcher.JobStateInfo.Reason)" }
+                Remove-Job $tagWatcher -Force
+            }
+        }
     }
     $hub = Get-HubResourceIds -Outputs $hubDeployment.Outputs -TemplateValues ([hashtable]$templateValues)
     if (-not $hub.StorageId) { throw 'The deployment outputs do not contain the storage account.' }
     if ($hub.QueryUri -and $hub.QueryUri.TrimEnd('/') -ne $queryUri) { Write-Warn "The hub deployment points to $($hub.QueryUri), not to eventhouse $queryUri. Re-run without -SkipHubDeployment." }
     $factoryPrincipalId = [string](Get-Value (Invoke-Arm -Path "$($hub.DataFactoryId)?api-version=2018-06-01").Content 'identity.principalId' $hub.PrincipalId)
     Write-Ok "Storage: $($hub.StorageName) | Data Factory: $($hub.DataFactoryName) | data store: $queryUri"
+    if ($UseKeylessRuntime) { $null = Assert-KeylessStorageLinkedServices -Hub $hub }
 
     # --- 5. Private endpoints ------------------------------------------------------------------------------
     $privateEndpoints = @()
@@ -2405,6 +2776,13 @@ try {
         $grantReader = [bool](Get-Value $templateValues 'enableRecommendations' $false)
         $exportResults = @(Set-AllCostExports -Hub $hub -Scopes $ExportScopes -GrantReader $grantReader)
     }
+    $runtimeAuthentication = $null
+    if ($UseKeylessRuntime) {
+        if (@($exportResults | Where-Object Error).Count -gt 0) { throw 'Cost export configuration failed; shared-key access was not changed by runtime hardening.' }
+        $authScopes = @(@(Get-DefaultExportScopes) + @($ExportScopes) | Where-Object { $_ } | Sort-Object -Unique)
+        $runtimeAuthentication = Set-KeylessHubRuntime -Hub $hub -FactoryPrincipalId $factoryPrincipalId -Scopes $authScopes
+        Write-Ok "Hub storage shared-key access disabled; $($runtimeAuthentication.StorageLinkedServices) identity-based storage linked service(s), $($runtimeAuthentication.Exports) managed-identity export(s). Deployment-script supporting storage retains its key exception."
+    }
 
     # --- 9. Dashboard -------------------------------------------------------------------------------------------
     Write-Step 'Fabric real-time dashboard'
@@ -2444,6 +2822,10 @@ try {
     $checks.Add([pscustomobject]@{ Check = 'Data Factory admin of both databases'; Result = (($adminResults | ForEach-Object { "$($_.Database)=$($_.Admin)" }) -join ', '); Pass = $adminOk })
     $checks.Add([pscustomobject]@{ Check = 'Hub initialization pipeline'; Result = $initialization.Status; Pass = ($initialization.Status -eq 'Succeeded') })
     $storageNow = (Invoke-Arm -Path "$($hub.StorageId)?api-version=2023-05-01").Content
+    if ($UseKeylessRuntime) {
+        $keysDisabled = (Get-Value $storageNow 'properties.allowSharedKeyAccess') -eq $false
+        $checks.Add([pscustomobject]@{ Check = 'Hub storage keyless runtime'; Result = "allowSharedKeyAccess=$(Get-Value $storageNow 'properties.allowSharedKeyAccess'); deployment-script exception retained"; Pass = $keysDisabled })
+    }
     $actionNow = [string](Get-Value $storageNow 'properties.networkAcls.defaultAction' '')
     $expectedAction = if ($KeepStorageFirewallClosed) { 'Deny' } else { 'Allow' }
     $checks.Add([pscustomobject]@{ Check = 'Storage firewall'; Result = "defaultAction=$actionNow (expected $expectedAction$(if (-not $KeepStorageFirewallClosed) { ' for Fabric ingestion' }))"; Pass = ($actionNow -eq $expectedAction) })
@@ -2496,6 +2878,10 @@ try {
         subscriptionId   = $SubscriptionId
         resourceGroup    = $ResourceGroupName
         hub              = $hub
+        runtimeAuthentication = $runtimeAuthentication
+        privateNetwork = if ($UsePublicNetworking) { $null } else {
+            @{ virtualNetworkId = $vnet.id; subnetId = $subnet.id; createRequested = [bool]$CreateVirtualNetwork; created = [bool]($networkResult -and $networkResult.Created) }
+        }
         fabric           = [ordered]@{
             capacityId         = $capacityArmId
             capacitySku        = $FabricCapacitySku

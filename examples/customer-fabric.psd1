@@ -19,6 +19,14 @@
     VirtualNetworkName              = 'vnet-hub'
     PrivateEndpointSubnetName       = 'snet-private-endpoints'
 
+    # Optional: create the named network/subnet instead of requiring them beforehand.
+    # The network RG is created if missing; compatible existing networks are reused without modification.
+    # Remove the explicit DNS settings below to create zones in this network RG automatically.
+    # CreateVirtualNetwork                 = $true
+    # VirtualNetworkAddressPrefix          = '10.30.0.0/24'
+    # PrivateEndpointSubnetAddressPrefix   = '10.30.0.0/28'
+    # UseKeylessRuntime                    = $true
+
     # Existing resource group that holds (or will hold) the private DNS zones, for example in a connectivity subscription.
     # Remove these two lines to use the virtual network's resource group, or replace them with: SkipPrivateDnsZones = $true
     PrivateDnsZoneSubscriptionId    = '00000000-0000-0000-0000-000000000000'
