@@ -1,0 +1,71 @@
+let envProdAndOwner = dynamic(['["Resource/cost",true,"Environment","Prod"]', '["Resource/cost",true,"Owner","TeamA"]']);
+let mixedSources = dynamic(['["Resource/cost",true,"Environment","Prod"]', '["Subscription",true,"CostCenter","Finance"]']);
+let allTags = materialize(TagTotals('Both', dynamic(null), dynamic(null), dynamic(null), '', false));
+let matchingTags = materialize(TagTotals('Resource/cost', dynamic(null), dynamic(null), envProdAndOwner, '', false));
+let resourceDetail = materialize(ResourceTotals('Resource/cost', dynamic(null), dynamic(null), envProdAndOwner, '', false));
+union
+    (allTags | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Rows = count(), Billed = sum(BilledCost), Effective = sum(EffectiveCost), Records = sum(CostRecordCount)
+        | project Check = 'All tag sources count each original USD charge once', Passed = Rows == 1 and Billed == 51.0 and Effective == 44.0 and Records == 5),
+    (allTags | where SubscriptionName == 'Total' and BillingCurrency == 'EUR'
+        | summarize Rows = count(), Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Tag totals keep EUR separate from USD', Passed = Rows == 1 and Billed == 5.0 and Records == 1),
+    (matchingTags | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Rows = count(), Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Two matching tags on a charge do not double count it', Passed = Rows == 1 and Billed == 21.0 and Records == 2),
+    (TagTotals('Both', dynamic(null), dynamic(null), mixedSources, '', false)
+        | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Matching subscription and resource tags use OR without duplication', Passed = Billed == 44.0 and Records == 4),
+    (TagTotals('Both', dynamic(null), dynamic(['[true,"Environment"]']), dynamic(null), '', false)
+        | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Name filter includes full costs of a matching subscription tag', Passed = Billed == 44.0 and Records == 4),
+    (TagTotals('Resource/cost', dynamic(null), dynamic(null), dynamic(['["Resource/cost",true,"Owner","Prod"]']), '', false)
+        | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Exact tag pairs do not match the same value under another name', Passed = Billed == 20.0 and Records == 1),
+    (TagTotals('Resource/cost', dynamic(null), dynamic(['[false,"(No tags)"]']), dynamic(null), '', false)
+        | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Untagged selection excludes a literal no-tags key', Passed = Billed == 3.0 and Records == 1),
+    (TagTotals('Both', dynamic(['sub2']), dynamic(null), dynamic(null), 'USD', false)
+        | where SubscriptionName == 'Total'
+        | summarize Rows = count(), Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Totals obey subscription and currency filters', Passed = Rows == 1 and Billed == 7.0 and Records == 1),
+    (TagTotals('Both', dynamic(null), dynamic(null), dynamic(null), 'USD', true)
+        | where SubscriptionName == 'Total'
+        | summarize Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Identical legitimate original charges are not deduplicated by value', Passed = Billed == 102.0 and Records == 10),
+    (TagTotals('Subscription', dynamic(['sub3']), dynamic(null), dynamic(null), '', false)
+        | where SubscriptionName == 'Total'
+        | summarize Rows = count(), Billed = sum(BilledCost), Records = sum(CostRecordCount)
+        | project Check = 'Matching inventory without exports has an explicit zero-record total', Passed = Rows == 1 and Billed == 0.0 and Records == 0),
+    (TagTotals('Both', dynamic(null), dynamic([]), dynamic(null), '', false)
+        | summarize Rows = count()
+        | project Check = 'An empty tag selection produces no detail or synthetic total', Passed = Rows == 0),
+    (allTags | serialize Position = row_number()
+        | summarize FirstTotal = minif(Position, SubscriptionName == 'Total'), LastDetail = maxif(Position, SubscriptionName != 'Total')
+        | project Check = 'Currency total rows are ordered after all detail rows', Passed = FirstTotal > LastDetail),
+    (SubscriptionTotals('Resource/cost', dynamic(null), dynamic(null), envProdAndOwner, '', false)
+        | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Billed = sum(BilledCost), Records = sum(CostRecordCount), Ids = countif(isnotempty(SubscriptionId))
+        | project Check = 'Matching subscriptions show full costs and blank synthetic subscription IDs', Passed = Billed == 44.0 and Records == 4 and Ids == 0),
+    (resourceDetail | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Matching = sum(MatchingTagBilledCost), Full = sum(FullResourceBilledCost),
+            MatchingRecords = sum(TagCostRecordCount), FullRecords = sum(ResourceCostRecordCount)
+        | project Check = 'Resource totals deduplicate matching and full-resource cost bases separately', Passed = Matching == 21.0 and Full == 41.0 and MatchingRecords == 2 and FullRecords == 3),
+    (ResourceTotals('Both', dynamic(null), dynamic(null), dynamic(null), '', false)
+        | where SubscriptionName == 'Total' and BillingCurrency == 'USD'
+        | summarize Matching = sum(MatchingTagBilledCost), Full = sum(FullResourceBilledCost)
+        | project Check = 'Resource totals retain deleted resources and charges without resource IDs', Passed = Matching == 51.0 and Full == 51.0),
+    (InventoryTotals() | where Inventory == 'Total'
+        | project Check = 'Inventory total deduplicates subscriptions and excludes resource summary sentinels',
+            Passed = Subscriptions == 3 and Resources == 4),
+    (MonthlyTotals() | where SubAccountName == 'Total'
+        | summarize Rows = count(), Dollars = sumif(Total, BillingCurrency == 'USD'), Euros = sumif(Total, BillingCurrency == 'EUR')
+        | project Check = 'Monthly pivot totals do not sum the horizontal total twice or mix currencies', Passed = Rows == 2 and Dollars == 44.0 and Euros == 4.0),
+    (MonthlyFractionalTotals() | where SubAccountName == 'Total'
+        | summarize Rows = count(), Correct = countif(Total == 0.3)
+        | project Check = 'Monthly monetary totals round after summing fractional amounts', Passed = Rows == 1 and Correct == 1)
+| order by Check asc
